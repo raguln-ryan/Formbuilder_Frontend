@@ -1,0 +1,26 @@
+.App {
+  min-height: 100vh;
+  background-color: var(--color-background);
+}
+
+.page-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--spacing-xl);
+}
+
+.page-header {
+  margin-bottom: var(--spacing-xl);
+}
+
+.page-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-sm);
+}
+
+.page-description {
+  color: var(--color-text-secondary);
+  font-size: 1.1rem;
+}

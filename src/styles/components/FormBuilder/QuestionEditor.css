@@ -1,0 +1,120 @@
+.question-editor {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: all var(--transition-fast);
+}
+
+.question-editor:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.question-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md);
+  background-color: var(--color-background);
+  cursor: pointer;
+  user-select: none;
+}
+
+.question-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  flex: 1;
+}
+
+.question-number {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.question-title {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.question-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.expand-icon {
+  margin-left: var(--spacing-sm);
+  transition: transform var(--transition-fast);
+}
+
+.question-body {
+  padding: var(--spacing-lg);
+  border-top: 1px solid var(--color-border);
+  animation: slideDown var(--transition-normal);
+}
+
+.checkbox-group {
+  display: flex;
+  gap: var(--spacing-lg);
+  margin: var(--spacing-md) 0;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.checkbox-group input[type="checkbox"] {
+  cursor: pointer;
+}
+
+.options-section {
+  margin-top: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background-color: var(--color-background);
+  border-radius: var(--radius-md);
+}
+
+.options-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.options-header h4 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.option-item {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.option-item .input-wrapper {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
