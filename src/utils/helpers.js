@@ -1,55 +1,87 @@
+// Generate unique ID
+export const generateId = () => {
+  return `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+// Format date
 export const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  if (!dateString) return 'N/A';
+  const options = { year: 'numeric', month: 'short', day: 'numeric' };
+  return new Date(dateString).toLocaleDateString(undefined, options);
 };
 
-export const truncateText = (text, maxLength = 100) => {
-  if (!text) return '';
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength) + '...';
-};
-
+// Validate email
 export const validateEmail = (email) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
 };
 
-export const validateForm = (formConfig, questions) => {
-  const errors = [];
-
-  if (!formConfig.title?.trim()) {
-    errors.push('Form title is required');
-  }
-
-  if (questions.length === 0) {
-    errors.push('At least one question is required');
-  }
-
-  questions.forEach((question, index) => {
-    if (!question.text?.trim()) {
-      errors.push(`Question ${index + 1} text is required`);
-    }
-
-    if (['checkbox', 'radio', 'dropdown'].includes(question.type)) {
-      if (!question.options || question.options.length === 0) {
-        errors.push(`Question ${index + 1} requires at least one option`);
-      }
-    }
-  });
-
-  return errors;
+// Debounce function
+export const debounce = (func, wait) => {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 };
 
-export const sortQuestions = (questions) => {
-  return [...questions].sort((a, b) => (a.order || 0) - (b.order || 0));
+// Deep clone object
+export const deepClone = (obj) => {
+  return JSON.parse(JSON.stringify(obj));
 };
 
-export const generateUniqueId = () => {
-  return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+// Check if object is empty
+export const isEmpty = (obj) => {
+  return Object.keys(obj).length === 0;
+};
+
+// Truncate text
+export const truncateText = (text, maxLength) => {
+  if (text.length <= maxLength) return text;
+  return text.substr(0, maxLength) + '...';
+};
+
+// Generate default question based on type
+export const getDefaultQuestion = (type) => {
+  const defaults = {
+    text: {
+      placeholder: 'Enter your answer',
+      maxLength: 255
+    },
+    textarea: {
+      placeholder: 'Enter detailed answer',
+      rows: 4,
+      maxLength: 1000
+    },
+    number: {
+      min: 0,
+      max: 999999
+    },
+    email: {
+      placeholder: 'email@example.com'
+    },
+    select: {
+      placeholder: 'Choose an option',
+      options: ['Option 1', 'Option 2', 'Option 3']
+    },
+    radio: {
+      options: ['Option 1', 'Option 2', 'Option 3']
+    },
+    checkbox: {
+      options: ['Option 1', 'Option 2', 'Option 3']
+    },
+    date: {
+      min: new Date().toISOString().split('T')[0]
+    },
+    file: {
+      accept: '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg',
+      maxSize: 10 // MB
+    }
+  };
+
+  return defaults[type] || {};
 };

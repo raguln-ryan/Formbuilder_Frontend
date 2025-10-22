@@ -4,94 +4,96 @@ import '../../styles/components/FormBuilder/QuestionPreview.css';
 const QuestionPreview = ({ formTitle, formDescription, questions }) => {
   const renderQuestionInput = (question) => {
     switch (question.type) {
-      case 'text':
-      case 'email':
-      case 'number':
-      case 'date':
+      case 'short_text':
         return (
           <input
-            type={question.type}
+            type="text"
             className="preview-input"
-            placeholder={`Enter ${question.type}`}
+            placeholder="Enter your answer"
             disabled
           />
         );
 
-      case 'textarea':
+      case 'long_text':
         return (
           <textarea
             className="preview-textarea"
-            placeholder="Enter your answer"
+            placeholder="Enter your detailed answer"
             rows={4}
             disabled
           />
         );
 
-      case 'checkbox':
+      case 'number':
         return (
-          <div className="preview-options">
-            {(question.options || []).map((option, idx) => (
-              <label key={idx} className="preview-checkbox">
-                <input type="checkbox" disabled />
-                <span>{option}</span>
-              </label>
-            ))}
-          </div>
+          <input
+            type="number"
+            className="preview-input"
+            placeholder="Enter number"
+            disabled
+          />
         );
 
-      case 'radio':
+      case 'date_picker':
         return (
-          <div className="preview-options">
-            {(question.options || []).map((option, idx) => (
-              <label key={idx} className="preview-radio">
-                <input type="radio" name={`question-${question.id}`} disabled />
-                <span>{option}</span>
-              </label>
-            ))}
-          </div>
+          <input
+            type="date"
+            className="preview-input"
+            disabled
+          />
         );
 
-      case 'dropdown':
+      case 'choice':
         return (
           <select className="preview-select" disabled>
             <option>Select an option</option>
             {(question.options || []).map((option, idx) => (
-              <option key={idx}>{option}</option>
+              <option key={option.optionId || idx}>
+                {typeof option === 'string' ? option : option.value}
+              </option>
             ))}
           </select>
         );
 
-      case 'file':
-      case 'fileupload':
+      case 'file_upload':
         return (
           <div className="preview-file">
             <input type="file" disabled />
-            <span className="file-help">Max file size: 5MB</span>
+            <span className="file-help">Max file size: 10MB</span>
           </div>
         );
 
       default:
-        return <p>Unsupported question type</p>;
+        return <p className="unsupported-type">Unsupported question type: {question.type}</p>;
     }
   };
 
   return (
     <div className="question-preview">
       <div className="preview-form">
-        <h2 className="preview-title">{formTitle || 'Untitled Form'}</h2>
-        {formDescription && <p className="preview-description">{formDescription}</p>}
+        <div className="preview-form-header">
+          <h2 className="preview-title">{formTitle || 'Untitled Form'}</h2>
+          {formDescription && (
+            <p className="preview-description">{formDescription}</p>
+          )}
+        </div>
         
         {questions.length === 0 ? (
           <div className="preview-empty">
+            <div className="empty-icon">📝</div>
             <p>No questions to preview</p>
+            <p className="empty-hint">Add questions to see them here</p>
           </div>
         ) : (
           <div className="preview-questions">
             {questions.map((question, index) => (
-              <div key={index} className="preview-question">
+              <div key={question.questionId || question.id || index} className="preview-question">
                 <div className="preview-question-header">
                   <label className="preview-label">
-                    {index + 1}. {question.text || 'Untitled Question'}
+                    <span className="preview-question-number">{index + 1}.</span>
+                    <span className="preview-question-text">
+                      {question.questionText || question.text || 'Untitled Question'}
+                    </span>
                     {question.required && <span className="required-mark">*</span>}
                   </label>
                 </div>
@@ -107,6 +109,12 @@ const QuestionPreview = ({ formTitle, formDescription, questions }) => {
             ))}
           </div>
         )}
+        
+        <div className="preview-footer">
+          <p className="preview-note">
+            * This is a preview. Form cannot be submitted from here.
+          </p>
+        </div>
       </div>
     </div>
   );

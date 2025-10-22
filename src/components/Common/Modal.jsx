@@ -1,16 +1,14 @@
 import React from 'react';
-import '../../styles/components/Common/Modal.css';
 import Button from './Button';
+import '../../styles/components/Common/Modal.css';
 
-const Modal = ({
-  isOpen,
-  onClose,
-  onConfirm,
-  title,
-  message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  variant = 'default'
+const Modal = ({ 
+  isOpen, 
+  onClose, 
+  onConfirm, 
+  title, 
+  message, 
+  variant = 'default' 
 }) => {
   if (!isOpen) return null;
 
@@ -18,7 +16,7 @@ const Modal = ({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{title}</h2>
+          <h3>{title}</h3>
           <button className="modal-close" onClick={onClose}>×</button>
         </div>
         <div className="modal-body">
@@ -26,10 +24,10 @@ const Modal = ({
         </div>
         <div className="modal-footer">
           <Button variant="secondary" onClick={onClose}>
-            {cancelText}
+            Cancel
           </Button>
           <Button variant={variant === 'danger' ? 'danger' : 'primary'} onClick={onConfirm}>
-            {confirmText}
+            Confirm
           </Button>
         </div>
       </div>

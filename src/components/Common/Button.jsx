@@ -5,18 +5,20 @@ const Button = ({
   children, 
   onClick, 
   variant = 'primary', 
-  size = 'medium', 
+  size = 'medium',
   disabled = false,
-  type = 'button',
-  className = ''
+  loading = false,
+  className = '',
+  ...props 
 }) => {
   return (
     <button
-      type={type}
+      className={`btn btn-${variant} btn-${size} ${className} ${loading ? 'btn-loading' : ''}`}
       onClick={onClick}
-      disabled={disabled}
-      className={`btn btn-${variant} btn-${size} ${className}`}
+      disabled={disabled || loading}
+      {...props}
     >
+      {loading && <span className="btn-spinner"></span>}
       {children}
     </button>
   );

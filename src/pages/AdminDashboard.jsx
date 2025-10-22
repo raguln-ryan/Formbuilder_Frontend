@@ -7,7 +7,6 @@ const AdminDashboard = () => {
     <div className="admin-dashboard">
       <div className="dashboard-header">
         <h1>Form Builder Dashboard</h1>
-        <p>Manage your forms and view responses</p>
       </div>
       <FormList />
     </div>

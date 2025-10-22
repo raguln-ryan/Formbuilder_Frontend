@@ -1,174 +1,231 @@
 import React, { useState } from 'react';
 import Input from '../Common/Input';
 import Button from '../Common/Button';
-import { QUESTION_TYPES } from '../../utils/constants';
 import '../../styles/components/FormBuilder/QuestionEditor.css';
 
-const QuestionEditor = ({ question, index, totalQuestions, onUpdate, onDelete, onMove }) => {
+const QuestionEditor = ({ 
+  question, 
+  index, 
+  totalQuestions, 
+  onUpdate, 
+  onDelete, 
+  onMove 
+}) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [options, setOptions] = useState(question.options || []);
+  const [localQuestion, setLocalQuestion] = useState(question);
 
-  const handleQuestionChange = (field, value) => {
-    const updatedQuestion = { ...question, [field]: value };
-    
-    if (field === 'type') {
-      // Reset type-specific fields when type changes
-      if (['checkbox', 'radio', 'dropdown'].includes(value)) {
-        updatedQuestion.options = options.length > 0 ? options : ['Option 1'];
-        updatedQuestion.multipleChoice = value === 'checkbox';
-        updatedQuestion.singleChoice = value === 'radio' || value === 'dropdown';
-      } else {
-        updatedQuestion.options = [];
-        updatedQuestion.multipleChoice = false;
-        updatedQuestion.singleChoice = false;
-      }
-    }
-    
-    onUpdate(updatedQuestion);
+  const handleFieldChange = (field, value) => {
+    const updated = { ...localQuestion, [field]: value };
+    setLocalQuestion(updated);
+    onUpdate(updated);
   };
 
-  const handleOptionsChange = (newOptions) => {
-    setOptions(newOptions);
-    onUpdate({ ...question, options: newOptions });
+  const handleOptionChange = (optionIndex, value) => {
+    const newOptions = [...localQuestion.options];
+    newOptions[optionIndex] = { ...newOptions[optionIndex], value };
+    handleFieldChange('options', newOptions);
   };
 
   const addOption = () => {
-    const newOptions = [...options, `Option ${options.length + 1}`];
-    handleOptionsChange(newOptions);
+    const newOptions = [...(localQuestion.options || []), { 
+      optionId: `opt_${Date.now()}`, 
+      value: `Option ${(localQuestion.options?.length || 0) + 1}` 
+    }];
+    handleFieldChange('options', newOptions);
   };
 
-  const updateOption = (optionIndex, value) => {
-    const newOptions = [...options];
-    newOptions[optionIndex] = value;
-    handleOptionsChange(newOptions);
+  const removeOption = (optionIndex) => {
+    if (localQuestion.options.length > 2) {
+      const newOptions = localQuestion.options.filter((_, i) => i !== optionIndex);
+      handleFieldChange('options', newOptions);
+    }
   };
 
-  const deleteOption = (optionIndex) => {
-    const newOptions = options.filter((_, i) => i !== optionIndex);
-    handleOptionsChange(newOptions);
+  const getQuestionTypeLabel = (type) => {
+    const types = {
+      short_text: 'Short Text',
+      long_text: 'Long Text',
+      number: 'Number',
+      date_picker: 'Date Picker',
+      choice: 'Dropdown',
+      file_upload: 'File Upload'
+    };
+    return types[type] || type;
   };
 
-  const hasOptions = ['checkbox', 'radio', 'dropdown'].includes(question.type);
+  const hasOptions = localQuestion.type === 'choice';
 
   return (
-    <div className="question-editor">
+    <div className={`question-editor ${isExpanded ? 'expanded' : 'collapsed'}`}>
       <div className="question-header" onClick={() => setIsExpanded(!isExpanded)}>
-        <div className="question-info">
-          <span className="question-number">Question {index + 1}</span>
-          {question.text && <span className="question-title">{question.text}</span>}
+        <div className="question-header-left">
+          <span className="question-number">{index + 1}</span>
+          <div className="question-info">
+            <span className="question-title">
+              {localQuestion.questionText || 'Untitled Question'}
+            </span>
+            <span className="question-type-badge">
+              {getQuestionTypeLabel(localQuestion.type)}
+            </span>
+          </div>
         </div>
-        <div className="question-actions">
-          <Button
-            variant="secondary"
-            size="small"
+        
+        <div className="question-header-actions">
+          <button
+            className="icon-button"
             onClick={(e) => {
               e.stopPropagation();
               onMove('up');
             }}
             disabled={index === 0}
+            title="Move Up"
           >
             ↑
-          </Button>
-          <Button
-            variant="secondary"
-            size="small"
+          </button>
+          <button
+            className="icon-button"
             onClick={(e) => {
               e.stopPropagation();
               onMove('down');
             }}
             disabled={index === totalQuestions - 1}
+            title="Move Down"
           >
             ↓
-          </Button>
-          <Button
-            variant="danger"
-            size="small"
+          </button>
+          <button
+            className="icon-button delete"
             onClick={(e) => {
               e.stopPropagation();
               onDelete();
             }}
+            title="Delete Question"
           >
-            Delete
-          </Button>
-          <span className="expand-icon">{isExpanded ? '▼' : '▶'}</span>
+            🗑️
+          </button>
+          <span className="expand-indicator">
+            {isExpanded ? '▼' : '▶'}
+          </span>
         </div>
       </div>
 
       {isExpanded && (
         <div className="question-body">
-          <Input
-            label="Question Text"
-            value={question.text}
-            onChange={(e) => handleQuestionChange('text', e.target.value)}
-            required
-            placeholder="Enter your question"
-          />
-
-          <Input
-            type="select"
-            label="Question Type"
-            value={question.type}
-            onChange={(e) => handleQuestionChange('type', e.target.value)}
-            options={QUESTION_TYPES}
-          />
-
-          <div className="checkbox-group">
-            <label>
-              <input
-                type="checkbox"
-                checked={question.required}
-                onChange={(e) => handleQuestionChange('required', e.target.checked)}
-              />
-              Required
-            </label>
-
-            <label>
-              <input
-                type="checkbox"
-                checked={question.descriptionEnabled}
-                onChange={(e) => handleQuestionChange('descriptionEnabled', e.target.checked)}
-              />
-              Enable Description
-            </label>
-          </div>
-
-          {question.descriptionEnabled && (
+          <div className="question-form">
             <Input
-              type="textarea"
-              label="Description"
-              value={question.description}
-              onChange={(e) => handleQuestionChange('description', e.target.value)}
-              placeholder="Add helpful text about this question"
+              label="Question Text"
+              value={localQuestion.questionText}
+              onChange={(e) => handleFieldChange('questionText', e.target.value)}
+              placeholder="Enter your question"
+              required
             />
-          )}
 
-          {hasOptions && (
-            <div className="options-section">
-              <div className="options-header">
-                <h4>Options</h4>
-                <Button size="small" onClick={addOption}>Add Option</Button>
-              </div>
-              <div className="options-list">
-                {options.map((option, optionIndex) => (
-                  <div key={optionIndex} className="option-item">
-                    <Input
-                      value={option}
-                      onChange={(e) => updateOption(optionIndex, e.target.value)}
-                      placeholder={`Option ${optionIndex + 1}`}
-                    />
-                    <Button
-                      variant="danger"
-                      size="small"
-                      onClick={() => deleteOption(optionIndex)}
-                      disabled={options.length <= 1}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                ))}
-              </div>
+            <div className="form-row">
+              <Input
+                type="select"
+                label="Question Type"
+                value={localQuestion.type}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  const updated = { ...localQuestion, type: newType };
+                  
+                  // Set default options for choice type
+                  if (newType === 'choice' && !localQuestion.options) {
+                    updated.options = [
+                      { optionId: 'opt_1', value: 'Option 1' },
+                      { optionId: 'opt_2', value: 'Option 2' }
+                    ];
+                    updated.singleChoice = true;
+                  }
+                  
+                  // Set format for date picker
+                  if (newType === 'date_picker') {
+                    updated.format = 'MM/DD/YYYY';
+                  }
+                  
+                  // Set maxLength for text types
+                  if (newType === 'short_text') {
+                    updated.maxLength = 100;
+                  } else if (newType === 'long_text') {
+                    updated.maxLength = 500;
+                  }
+                  
+                  setLocalQuestion(updated);
+                  onUpdate(updated);
+                }}
+              >
+                <option value="short_text">Short Text</option>
+                <option value="long_text">Long Text</option>
+                <option value="number">Number</option>
+                <option value="date_picker">Date Picker</option>
+                <option value="choice">Dropdown</option>
+                <option value="file_upload">File Upload</option>
+              </Input>
             </div>
-          )}
+
+            <div className="question-settings">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={localQuestion.required || false}
+                  onChange={(e) => handleFieldChange('required', e.target.checked)}
+                />
+                <span>Required field</span>
+              </label>
+
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={localQuestion.descriptionEnabled || false}
+                  onChange={(e) => handleFieldChange('descriptionEnabled', e.target.checked)}
+                />
+                <span>Add description</span>
+              </label>
+            </div>
+
+            {localQuestion.descriptionEnabled && (
+              <Input
+                type="textarea"
+                label="Description"
+                value={localQuestion.description || ''}
+                onChange={(e) => handleFieldChange('description', e.target.value)}
+                placeholder="Add helpful text for this question"
+                rows={2}
+              />
+            )}
+
+            {hasOptions && (
+              <div className="options-section">
+                <div className="options-header">
+                  <label className="options-label">Answer Options</label>
+                  <Button size="small" onClick={addOption}>
+                    + Add Option
+                  </Button>
+                </div>
+                
+                <div className="options-list">
+                  {(localQuestion.options || []).map((option, optionIndex) => (
+                    <div key={option.optionId || optionIndex} className="option-item">
+                      <span className="option-number">{optionIndex + 1}.</span>
+                      <Input
+                        value={option.value}
+                        onChange={(e) => handleOptionChange(optionIndex, e.target.value)}
+                        placeholder={`Option ${optionIndex + 1}`}
+                      />
+                      <button
+                        className="remove-option-btn"
+                        onClick={() => removeOption(optionIndex)}
+                        disabled={localQuestion.options.length <= 2}
+                        title="Remove option"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

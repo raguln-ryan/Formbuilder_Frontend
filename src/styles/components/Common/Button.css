@@ -1,17 +1,15 @@
 .btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--spacing-sm) var(--spacing-lg);
-  border: none;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  text-decoration: none;
-  outline: none;
-  position: relative;
-  overflow: hidden;
+  gap: 8px;
 }
 
 .btn:disabled {
@@ -30,25 +28,23 @@
 
 /* Variants */
 .btn-primary {
-  background-color: var(--color-primary);
+  background: #0056b3;
   color: white;
 }
 
-.btn-primary:not(:disabled):hover {
-  background-color: var(--color-primary-dark);
+.btn-primary:hover:not(:disabled) {
+  background: #0056b3;
 }
 
 .btn-secondary {
-  background-color: var(--color-secondary);
-  color: white;
+  background: white;
+  color: #0056b3;
 }
 
-.btn-secondary:not(:disabled):hover {
-  background-color: var(--color-secondary-dark);
-}
+
 
 .btn-danger {
-  background-color: var(--color-danger);
+  background: #0056b3;
   color: white;
 }
 
@@ -67,16 +63,29 @@
 
 /* Sizes */
 .btn-small {
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: 0.875rem;
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 .btn-medium {
-  padding: var(--spacing-sm) var(--spacing-lg);
-  font-size: 1rem;
+  padding: 10px 20px;
+  font-size: 14px;
 }
 
 .btn-large {
   padding: var(--spacing-md) var(--spacing-xl);
   font-size: 1.125rem;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
