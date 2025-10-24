@@ -1,0 +1,165 @@
+.logout-button-container {
+  position: relative;
+  display: inline-block;
+}
+
+.logout-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+}
+
+.logout-btn:hover {
+  background: #c82333;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(220, 53, 69, 0.3);
+}
+
+.logout-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(220, 53, 69, 0.2);
+}
+
+.logout-btn.loading {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.logout-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.logout-text {
+  font-weight: 500;
+}
+
+/* Confirmation Modal Styles */
+.logout-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.logout-modal {
+  background: white;
+  border-radius: 10px;
+  padding: 30px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.logout-modal-header {
+  margin-bottom: 20px;
+}
+
+.logout-modal-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.logout-modal-body {
+  margin-bottom: 25px;
+}
+
+.logout-modal-message {
+  color: #666;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.logout-modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.modal-btn-cancel {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.modal-btn-cancel:hover {
+  background: #dee2e6;
+}
+
+.modal-btn-confirm {
+  background: #dc3545;
+  color: white;
+}
+
+.modal-btn-confirm:hover {
+  background: #c82333;
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .logout-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+  }
+  
+  .logout-modal {
+    padding: 20px;
+  }
+  
+  .logout-modal-title {
+    font-size: 18px;
+  }
+  
+  .logout-modal-message {
+    font-size: 14px;
+  }
+}

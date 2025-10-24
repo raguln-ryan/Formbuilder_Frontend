@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import formService from '../../services/formService';
 import Button from '../Common/Button';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import Modal from '../Common/Modal';
 import '../../styles/components/FormBuilder/FormList.css';
+import searchIcon from '../../assets/Ellipse.png';
 
 const FormList = () => {
   const [forms, setForms] = useState([]);
@@ -15,6 +17,13 @@ const FormList = () => {
   const [error, setError] = useState(null);
   const [activeMenu, setActiveMenu] = useState(null);
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'Admin') {
+      navigate('/login');
+    }
+  }, [isAuthenticated, user, navigate]);
 
   useEffect(() => {
     fetchForms();
@@ -42,7 +51,7 @@ const FormList = () => {
       setLoading(true);
       setError(null);
       const response = await formService.getAllForms();
-      
+
       if (response?.data) {
         setForms(response.data);
         setFilteredForms(response.data);
@@ -96,13 +105,51 @@ const FormList = () => {
   };
 
   const handleViewResponses = (formId) => {
-    // Navigate to responses page with the form ID
     navigate(`/form/${formId}/responses`);
     setActiveMenu(null);
   };
 
+  // Move handleShare inside the component
+  const handleShare = async (formId) => {
+    const publicUrl = `${window.location.origin}/form/${formId}`;
+
+    try {
+      // Try to use the modern clipboard API first
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(publicUrl);
+        alert(`✅ Form link copied to clipboard!\n\n${publicUrl}\n\nShare this link for people to fill the form.`);
+      } else {
+        // Fallback for older browsers or non-secure contexts
+        const textArea = document.createElement('textarea');
+        textArea.value = publicUrl;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          document.execCommand('copy');
+          alert(`✅ Form link copied to clipboard!\n\n${publicUrl}\n\nShare this link for people to fill the form.`);
+        } catch (err) {
+          // If copy fails, just show the link
+          prompt('Copy this link to share your form:', publicUrl);
+        } finally {
+          document.body.removeChild(textArea);
+        }
+      }
+    } catch (err) {
+      // If all else fails, show the link in a prompt
+      console.error('Failed to copy:', err);
+      prompt('Copy this link to share your form:', publicUrl);
+    }
+
+    setActiveMenu(null);
+  };
+
   if (loading) return <LoadingSpinner />;
-  
+
   if (error) {
     return (
       <div className="form-list-container">
@@ -122,19 +169,25 @@ const FormList = () => {
       <div className="form-list-header">
         <h2>Form List</h2>
         <div className="form-list-actions">
-          <input
-            type="text"
-            placeholder="Search forms..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-search-input"
-          />
-          <button 
+
+          <div className="search-bar">
+            <img src={searchIcon} alt="Search" className="search-icon" />
+            <input
+              type="text"
+              placeholder="Search forms..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="form-search-input"
+            />
+          </div>
+
+          <button
             className="create-form-btn"
             onClick={() => navigate('/form/new')}
           >
-            + Create Form
+            Create Form
           </button>
+
         </div>
       </div>
 
@@ -144,11 +197,11 @@ const FormList = () => {
           <h3>No forms found</h3>
           <p>{searchTerm ? 'No forms match your search' : 'Create your first form to get started'}</p>
           {!searchTerm && (
-            <button 
+            <button
               className="create-form-btn"
               onClick={() => navigate('/form/new')}
             >
-              + Create Form
+               Create Form
             </button>
           )}
         </div>
@@ -157,7 +210,7 @@ const FormList = () => {
           {filteredForms.map((form) => (
             <div key={form.formId || form._id} className="form-card">
               <div className="menu-container">
-                <button 
+                <button
                   className="menu-dots"
                   onClick={(e) => toggleMenu(form.formId || form._id, e)}
                   aria-label="More options"
@@ -168,7 +221,7 @@ const FormList = () => {
                 </button>
                 {activeMenu === (form.formId || form._id) && (
                   <div className="dropdown-menu">
-                    <button 
+                    <button
                       onClick={() => handleEdit(form.formId || form._id)}
                       disabled={form.status === 1}
                       className="dropdown-item"
@@ -176,15 +229,23 @@ const FormList = () => {
                       Edit
                     </button>
                     {form.status === 0 && (
-                      <button 
+                      <button
                         onClick={() => handlePublish(form.formId || form._id)}
                         className="dropdown-item"
                       >
                         Publish
                       </button>
                     )}
+                    {form.status === 1 && (
+                      <button
+                        onClick={() => handleShare(form.formId || form._id)}
+                        className="dropdown-item"
+                      >
+                        📤 Share Form
+                      </button>
+                    )}
                     <hr className="dropdown-divider" />
-                    <button 
+                    <button
                       onClick={() => handleDeleteClick(form.formId || form._id)}
                       className="dropdown-item delete"
                     >
@@ -195,12 +256,11 @@ const FormList = () => {
               </div>
 
               <div className="form-card-content">
+               
                 <h3 className="form-name">{form.title || 'Untitled Form'}</h3>
-                
+
                 <div className="form-details">
-                  {/* Show different details based on status */}
                   {form.status === 0 ? (
-                    // Draft form details
                     <>
                       <div className="form-detail-item">
                         <span className="form-detail-label">Created by:</span>
@@ -209,18 +269,14 @@ const FormList = () => {
                       <div className="form-detail-item">
                         <span className="form-detail-label">Created date:</span>
                         <span>
-                          {form.createdDate 
-                            ? new Date(form.createdDate).toLocaleDateString() 
+                          {form.createdDate
+                            ? new Date(form.createdDate).toLocaleDateString()
                             : new Date().toLocaleDateString()}
                         </span>
                       </div>
-                      <div className="form-detail-item">
-                        <span className="form-detail-label">Workflow usage:</span>
-                        <span>{form.workflowUsage || 'Standard'}</span>
-                      </div>
+
                     </>
                   ) : (
-                    // Published form details
                     <>
                       <div className="form-detail-item">
                         <span className="form-detail-label">Published by:</span>
@@ -229,24 +285,21 @@ const FormList = () => {
                       <div className="form-detail-item">
                         <span className="form-detail-label">Published date:</span>
                         <span>
-                          {form.publishedDate 
-                            ? new Date(form.publishedDate).toLocaleDateString() 
+                          {form.publishedDate
+                            ? new Date(form.publishedDate).toLocaleDateString()
                             : 'N/A'}
                         </span>
                       </div>
-                      <div className="form-detail-item">
-                        <span className="form-detail-label">Workflow usage:</span>
-                        <span>{form.workflowUsage || 'Standard'}</span>
-                      </div>
+                      
                     </>
                   )}
                 </div>
-
+                <hr/>
                 <div className="form-card-footer">
                   <button className={`status-badge status-${form.status === 0 ? 'draft' : 'published'}`}>
                     {form.status === 0 ? 'Draft' : 'Published'}
                   </button>
-                  <button 
+                  <button
                     className="view-responses-btn"
                     onClick={() => handleViewResponses(form.formId || form._id)}
                   >

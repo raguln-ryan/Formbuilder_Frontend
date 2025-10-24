@@ -1,15 +1,23 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import SectionEditor from './SectionEditor';
-import QuestionPreview from './QuestionPreview';
+import { useAuth } from '../../contexts/AuthContext';
+import FormConfig from './FormConfig';
+import FormLayout from './FormLayout';
 import formService from '../../services/formService';
-import Button from '../Common/Button';
-import Input from '../Common/Input';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import '../../styles/components/FormBuilder/FormEditor.css';
 
 const FormEditor = ({ formId }) => {
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuth();
+  
+  // Authentication check
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== 'Admin') {
+      navigate('/login');
+    }
+  }, [isAuthenticated, user, navigate]);
+  
   const isEdit = formId && formId !== 'new';
   
   const [activeTab, setActiveTab] = useState('config');
@@ -24,7 +32,6 @@ const FormEditor = ({ formId }) => {
   
   const [questions, setQuestions] = useState([]);
   const [currentFormId, setCurrentFormId] = useState(null);
-  const [showPreview, setShowPreview] = useState(false);
 
   // Character limits
   const TITLE_CHAR_LIMIT = 80;
@@ -49,8 +56,8 @@ const FormEditor = ({ formId }) => {
         setCurrentFormId(formId);
       }
     } catch (error) {
-      console.error('Error fetching form:', error);
       alert('Failed to load form data');
+      navigate('/admin');
     } finally {
       setLoading(false);
     }
@@ -121,6 +128,27 @@ const FormEditor = ({ formId }) => {
         await formService.updateFormConfig(savedFormId, formData);
       }
       
+      // Save to localStorage as draft
+      const savedForms = JSON.parse(localStorage.getItem('saved_forms') || '[]');
+      const formToSave = {
+        formId: savedFormId,
+        _id: savedFormId,
+        title: formData.title,
+        description: formData.description,
+        questions: questions,
+        status: 0,
+        savedAt: new Date().toISOString()
+      };
+      
+      const existingIndex = savedForms.findIndex(f => f.formId === savedFormId);
+      if (existingIndex >= 0) {
+        savedForms[existingIndex] = formToSave;
+      } else {
+        savedForms.push(formToSave);
+      }
+      
+      localStorage.setItem('saved_forms', JSON.stringify(savedForms));
+      
       // Save questions if any exist
       if (questions.length > 0 && savedFormId) {
         await formService.updateForm(savedFormId, { questions });
@@ -128,7 +156,6 @@ const FormEditor = ({ formId }) => {
       
       alert('Form saved as draft successfully!');
     } catch (error) {
-      console.error('Error saving form:', error);
       alert('Failed to save form. Please try again.');
     } finally {
       setSaving(false);
@@ -152,7 +179,6 @@ const FormEditor = ({ formId }) => {
       
       setActiveTab('layout');
     } catch (error) {
-      console.error('Error:', error);
       alert('Failed to save form configuration.');
     } finally {
       setSaving(false);
@@ -172,10 +198,31 @@ const FormEditor = ({ formId }) => {
     
     try {
       setSaving(true);
+      
+      // Save to localStorage
+      const savedForms = JSON.parse(localStorage.getItem('saved_forms') || '[]');
+      const formToSave = {
+        formId: currentFormId,
+        _id: currentFormId,
+        title: formData.title,
+        description: formData.description,
+        questions: questions,
+        status: 0,
+        savedAt: new Date().toISOString()
+      };
+      
+      const existingIndex = savedForms.findIndex(f => f.formId === currentFormId);
+      if (existingIndex >= 0) {
+        savedForms[existingIndex] = formToSave;
+      } else {
+        savedForms.push(formToSave);
+      }
+      
+      localStorage.setItem('saved_forms', JSON.stringify(savedForms));
+      
       await formService.updateForm(currentFormId, { questions });
       alert('Form saved as draft successfully!');
     } catch (error) {
-      console.error('Error saving draft:', error);
       alert('Failed to save form as draft.');
     } finally {
       setSaving(false);
@@ -188,22 +235,26 @@ const FormEditor = ({ formId }) => {
       return;
     }
     
-    if (questions.length === 0) {
-      alert('Cannot publish form without questions');
+    if (!questions || questions.length === 0) {
+      alert('Cannot publish form without questions. Please add at least one question.');
       return;
     }
     
     try {
       setSaving(true);
-      // Save layout first
+      
+      // Update form with questions
       await formService.updateForm(currentFormId, { questions });
-      // Then publish
+      
+      // Publish the form
       await formService.publishForm(currentFormId);
-      alert('Form published successfully!');
+      
+      const publicUrl = `${window.location.origin}/form/${currentFormId}`;
+      alert(`✅ Form published successfully!\n\nPublic link: ${publicUrl}`);
+      
       navigate('/admin');
     } catch (error) {
-      console.error('Error publishing form:', error);
-      alert('Failed to publish form.');
+      alert('Failed to publish form. ' + (error.response?.data?.message || ''));
     } finally {
       setSaving(false);
     }
@@ -213,157 +264,56 @@ const FormEditor = ({ formId }) => {
     setQuestions(updatedQuestions);
   };
 
-  const togglePreview = () => {
-    setShowPreview(!showPreview);
-  };
-
   if (loading) {
     return <LoadingSpinner message="Loading form..." />;
   }
 
-  // Render Form Config Tab
-  const renderFormConfig = () => (
-    <div className="form-config-section">
-      <div className="form-config-box">
-        <h2 className="config-title">Form Configuration</h2>
-        
-        <div className="form-field">
-          <Input
-            label={`Form Name (${formData.title.length}/${TITLE_CHAR_LIMIT})`}
-            value={formData.title}
-            onChange={(e) => handleInputChange('title', e.target.value)}
-            placeholder="Enter Form Name"
-            error={errors.title}
-            required
-            maxLength={TITLE_CHAR_LIMIT}
-          />
-        </div>
-
-        <div className="form-field">
-          <Input
-            type="textarea"
-            label={`Form Description (${formData.description.length}/${DESCRIPTION_CHAR_LIMIT})`}
-            value={formData.description}
-            onChange={(e) => handleInputChange('description', e.target.value)}
-            placeholder="Summarize the form's purpose of internal reference."
-            rows={4}
-            error={errors.description}
-            required
-            maxLength={DESCRIPTION_CHAR_LIMIT}
-          />
-        </div>
-
-        <div className="form-config-actions">
-          <Button 
-            variant="secondary"
-            onClick={handleSaveAsDraft}
-            loading={saving}
-            disabled={!formData.title.trim() || !formData.description.trim()}
-          >
-            Save as Draft
-          </Button>
-          <Button 
-            variant="primary"
-            onClick={handleNext}
-            loading={saving}
-            disabled={!formData.title.trim() || !formData.description.trim()}
-          >
-            Next: Add Questions →
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Render Form Layout Tab
-  const renderFormLayout = () => (
-    <div className="form-layout-section">
-      {showPreview ? (
-        <div className="preview-modal">
-          <div className="preview-modal-content">
-            <div className="preview-modal-header">
-              <h2>Form Preview</h2>
-              <button className="close-preview" onClick={togglePreview}>×</button>
-            </div>
-            <QuestionPreview
-              formTitle={formData.title}
-              formDescription={formData.description}
-              questions={questions}
-            />
-          </div>
-        </div>
-      ) : null}
-      
-      <div className="layout-content-wrapper">
-        <SectionEditor 
-          questions={questions}
-          onQuestionsChange={handleQuestionsChange}
-          formTitle={formData.title}
-          formDescription={formData.description}
-        />
-        
-        <div className="form-layout-actions">
-          <div className="action-group-left">
-            <Button 
-              variant="secondary"
-              onClick={togglePreview}
-            >
-              <span style={{ marginRight: '8px' }}>👁️</span>
-              Preview Form
-            </Button>
-          </div>
-          <div className="action-group-right">
-            <Button 
-              variant="secondary"
-              onClick={handleSaveLayoutAsDraft}
-              loading={saving}
-              disabled={questions.length === 0}
-            >
-              Save as Draft
-            </Button>
-            <Button 
-              variant="primary"
-              onClick={handlePublish}
-              loading={saving}
-              disabled={questions.length === 0}
-            >
-              Publish Form
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="form-editor-container">
-      <div className="form-editor-header">
-        <div className="header-left">
-          <div className="form-editor-tabs">
+    <div className="form-editor-main-container">
+      <div className="form-editor-content-wrapper">
+        {/* Tabs header */}
+        <div className="form-editor-tabs-header">
+          <div className="tabs-container">
             <button
-              className={`tab ${activeTab === 'config' ? 'active' : ''}`}
+              className={`tab-button ${activeTab === 'config' ? 'tab-active' : ''}`}
               onClick={() => setActiveTab('config')}
             >
               Form Configuration
             </button>
             <button
-              className={`tab ${activeTab === 'layout' ? 'active' : ''} ${!currentFormId && !formData.title ? 'disabled' : ''}`}
+              className={`tab-button ${activeTab === 'layout' ? 'tab-active' : ''} ${!currentFormId && !formData.title ? 'tab-disabled' : ''}`}
               onClick={() => currentFormId || formData.title ? setActiveTab('layout') : null}
               disabled={!currentFormId && !formData.title}
             >
-              Form Layout
+              Form Layout 
             </button>
           </div>
         </div>
-        <div className="header-right">
-          <button className="back-nav-button" onClick={() => navigate('/admin')}>
-            Back to Dashboard →
-          </button>
-        </div>
-      </div>
 
-      <div className="form-editor-content">
-        {activeTab === 'config' ? renderFormConfig() : renderFormLayout()}
+        {/* Content area */}
+        <div className="form-editor-content-area">
+          {activeTab === 'config' ? (
+            <FormConfig
+              formData={formData}
+              onInputChange={handleInputChange}
+              onSaveAsDraft={handleSaveAsDraft}
+              onNext={handleNext}
+              errors={errors}
+              saving={saving}
+              TITLE_CHAR_LIMIT={TITLE_CHAR_LIMIT}
+              DESCRIPTION_CHAR_LIMIT={DESCRIPTION_CHAR_LIMIT}
+            />
+          ) : (
+            <FormLayout
+              formData={formData}
+              questions={questions}
+              onQuestionsChange={handleQuestionsChange}
+              onSaveAsDraft={handleSaveLayoutAsDraft}
+              onPublish={handlePublish}
+              saving={saving}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

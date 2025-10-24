@@ -5,14 +5,14 @@ import '../../styles/components/FormBuilder/SectionEditor.css';
 
 const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescription }) => {
   const [draggedOver, setDraggedOver] = useState(null);
-  
+
   const fieldTypes = [
-    { type: 'short_text', label: 'Short Text', icon: '📝', description: 'Single line text input' },
-    { type: 'long_text', label: 'Long Text', icon: '📄', description: 'Multi-line text area' },
-    { type: 'number', label: 'Number', icon: '🔢', description: 'Numeric input field' },
-    { type: 'date_picker', label: 'Date Picker', icon: '📅', description: 'Date selection' },
-    { type: 'choice', label: 'Dropdown', icon: '📋', description: 'Dropdown selection' },
-    { type: 'file_upload', label: 'File Upload', icon: '📁', description: 'File attachment' }
+    { type: 'short_text', label: 'Short Text', icon: '📝' },
+    { type: 'long_text', label: 'Long Text', icon: '📄' },
+    { type: 'date_picker', label: 'Date Picker', icon: '📅' },
+    { type: 'choice', label: 'Dropdown', icon: '📋' },
+    { type: 'file_upload', label: 'File Upload', icon: '📁' },
+    { type: 'number', label: 'Number', icon: '🔢' }
   ];
 
   const handleDragStart = (e, fieldType) => {
@@ -33,32 +33,31 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
   const handleDrop = (e) => {
     e.preventDefault();
     setDraggedOver(false);
-    
+
     try {
       const fieldType = JSON.parse(e.dataTransfer.getData('fieldType'));
-      
+
       const newQuestion = {
-        questionId: generateId(),
+        _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         type: fieldType.type,
-        questionText: `New ${fieldType.label} Question`,
+        question: `New ${fieldType.label} Question`, // ← CHANGED: Use 'question' instead of 'text'
+        description_enabled: false,
         description: '',
-        descriptionEnabled: false,
-        singleChoice: fieldType.type === 'choice' ? true : false,
-        multipleChoice: false,
-        options: fieldType.type === 'choice' 
+        single_choice: fieldType.type === 'choice' ? true : false,
+        multiple_choice: false,
+        options: fieldType.type === 'choice'
           ? [
-              { optionId: generateId(), value: 'Option 1' },
-              { optionId: generateId(), value: 'Option 2' }
-            ] 
-          : null,
+            { _id: generateId(), value: 'Option 1' },
+            { _id: generateId(), value: 'Option 2' }
+          ]
+          : [],
         format: fieldType.type === 'date_picker' ? 'MM/DD/YYYY' : null,
         required: false,
         order: questions.length,
-        maxLength: fieldType.type === 'short_text' ? 100 : 
-                   fieldType.type === 'long_text' ? 500 : null,
+        maxLength: null,
         enabled: true
       };
-      
+
       onQuestionsChange([...questions, newQuestion]);
     } catch (error) {
       console.error('Error adding question:', error);
@@ -83,11 +82,11 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
   const handleQuestionMove = (index, direction) => {
     const newQuestions = [...questions];
     const newIndex = direction === 'up' ? index - 1 : index + 1;
-    
+
     if (newIndex >= 0 && newIndex < questions.length) {
-      [newQuestions[index], newQuestions[newIndex]] = 
-      [newQuestions[newIndex], newQuestions[index]];
-      
+      [newQuestions[index], newQuestions[newIndex]] =
+        [newQuestions[newIndex], newQuestions[index]];
+
       // Update order
       newQuestions.forEach((q, i) => {
         q.order = i;
@@ -96,12 +95,23 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
     }
   };
 
+  const handleQuestionDuplicate = (duplicatedQuestion) => {
+    const questionToDuplicate = {
+      ...duplicatedQuestion,
+      _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      order: questions.length
+    };
+
+    const newQuestions = [...questions, questionToDuplicate];
+    onQuestionsChange(newQuestions);
+  };
+
   return (
     <div className="section-editor">
       <div className="section-editor-sidebar">
-        <h3 className="sidebar-title">Question Types</h3>
-        <p className="sidebar-hint">Drag fields to add them to your form</p>
-        
+        <h3 className="sidebar-title">Input Fields</h3>
+
+
         <div className="field-types-list">
           {fieldTypes.map((field) => (
             <div
@@ -121,35 +131,40 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
       </div>
 
       <div className="section-editor-main">
-        <div 
-          className={`drop-zone ${draggedOver ? 'dragging' : ''}`}
+        {/* Form Header as separate card */}
+        <div className="form-header-card">
+          <div className="form-header-label">Header</div>
+          <div className="form-header-content">
+            <h2 className="form-title">{formTitle || 'Untitled Form'}</h2>
+            <p className="form-description">{formDescription || 'No description available'}</p>
+          </div>
+        </div>
+
+        {/* Drag and Drop Zone */}
+        <div
+          className={`drop-zone ${draggedOver ? 'dragging' : ''} ${questions.length === 0 ? 'empty' : ''}`}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
         >
-          {/* Form Header inside drop zone */}
-          <div className="form-header-section">
-            <h2 className="form-title">{formTitle || 'Untitled Form'}</h2>
-            <p className="form-description">{formDescription || 'No description available'}</p>
-          </div>
-
           {questions.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">📋</div>
-              <h3>Start building your form</h3>
-              <p>Drag question types from the left panel to add them here</p>
+              <div className="empty-icon">➕</div>
+               <p>Drag field form the left panel</p>
             </div>
+            
           ) : (
             <div className="questions-container">
               {questions.map((question, index) => (
                 <QuestionEditor
-                  key={question.questionId}
+                  key={question._id}
                   question={question}
                   index={index}
                   totalQuestions={questions.length}
                   onUpdate={(updated) => handleQuestionUpdate(index, updated)}
                   onDelete={() => handleQuestionDelete(index)}
                   onMove={(direction) => handleQuestionMove(index, direction)}
+                  onDuplicate={handleQuestionDuplicate}
                 />
               ))}
             </div>

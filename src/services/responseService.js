@@ -1,45 +1,89 @@
 import api from './api';
 
-export const responseService = {
-  // Get published forms for learners
+const responseService = {
+  // Get all responses for a form (Admin only)
+  getFormResponses: async (formId) => {
+    try {
+      const response = await api.get(`/response/form/${formId}/responses`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching form responses:', error);
+      return [];
+    }
+  },
+
+  // Get published forms (Learner)
   getPublishedForms: async () => {
-    return await api.get('/Response/published');
+    try {
+      const response = await api.get('/response/published');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching published forms:', error);
+      throw error;
+    }
   },
 
-  // Submit response
-  submitResponse: async (data) => {
-    return await api.post('/Response', data);
+  // Submit form response (Learner)
+  submitResponse: async (formData) => {
+    try {
+      const response = await api.post('/response', formData);
+      return response.data;
+    } catch (error) {
+      console.error('Error submitting response:', error);
+      throw error;
+    }
   },
 
-  // Get responses by form
-  getResponsesByForm: async (formId) => {
-    return await api.get(`/Response/form/${formId}/responses`);
+  // Get response details with attachments
+  getResponseDetails: async (responseId) => {
+    try {
+      const response = await api.get(`/response/${responseId}/details`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching response details:', error);
+      throw error;
+    }
   },
 
-  // Get response by ID
-  getResponseById: async (responseId) => {
-    return await api.get(`/Response/${responseId}`);
-  },
+  // Export responses to CSV (Admin)
+  exportToCSV: async (formId) => {
+    try {
+      const responses = await responseService.getFormResponses(formId);
+      
+      if (!responses || responses.length === 0) {
+        alert('No responses to export');
+        return;
+      }
 
-  // Download file attachment
-  downloadFile: async (responseId, questionId) => {
-    const response = await api.get(`/Response/${responseId}/file/${questionId}`, {
-      responseType: 'blob'
-    });
-    
-    // Create download link
-    const url = window.URL.createObjectURL(new Blob([response]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `file_${responseId}_${questionId}`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
-  },
+      // Generate CSV content
+      const headers = ['Response ID', 'User ID', 'Submitted At', 'Status'];
+      const rows = responses.map(r => [
+        r.id,
+        r.userId,
+        new Date(r.submittedAt).toLocaleString(),
+        r.status || 'Completed'
+      ]);
 
-  // Get response with file details
-  getResponseWithDetails: async (responseId) => {
-    return await api.get(`/Response/${responseId}/details`);
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      // Download CSV
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `responses-${formId}-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting responses:', error);
+      alert('Failed to export responses');
+    }
   }
 };
+
+export default responseService;

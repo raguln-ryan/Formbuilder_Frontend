@@ -1,0 +1,65 @@
+/* Form Configuration Actions Floating Bar */
+.form-config-actions-floating {
+  @apply w-[1439px] 
+         h-[72px] 
+         bg-white 
+         flex 
+         items-center 
+         justify-end 
+         gap-4 
+         px-6
+         fixed
+         bottom-0
+         shadow-lg;
+}
+
+/* Secondary Button Style (Save as Draft) */
+.form-config-actions-floating .btn-secondary,
+.form-config-actions-floating button[variant="secondary"] {
+  @apply w-32 
+         h-10 
+         flex 
+         items-center 
+         justify-center
+         gap-2.5
+         rounded-lg 
+         border 
+         border-[#B3B3B3] 
+         py-2 
+         px-6 
+         bg-white
+         hover:bg-gray-50
+         transition-colors;
+}
+
+/* Primary Button Style (Next) */
+.form-config-actions-floating .btn-primary,
+.form-config-actions-floating button[variant="primary"] {
+  @apply w-[102px] 
+         h-10 
+         flex 
+         items-center 
+         justify-center
+         rounded-lg 
+         bg-[#F0F0F0]
+         hover:bg-[#E0E0E0]
+         transition-colors;
+}
+
+/* Button text styles */
+.form-config-actions-floating button {
+  @apply font-medium 
+         text-sm 
+         leading-6;
+}
+
+/* Disabled state */
+.form-config-actions-floating button:disabled {
+  @apply opacity-50 
+         cursor-not-allowed;
+}
+
+/* Loading state */
+.form-config-actions-floating button.loading {
+  @apply cursor-wait;
+}

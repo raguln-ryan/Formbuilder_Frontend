@@ -9,7 +9,8 @@ const QuestionEditor = ({
   totalQuestions, 
   onUpdate, 
   onDelete, 
-  onMove 
+  onMove,
+  onDuplicate 
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [localQuestion, setLocalQuestion] = useState(question);
@@ -28,7 +29,7 @@ const QuestionEditor = ({
 
   const addOption = () => {
     const newOptions = [...(localQuestion.options || []), { 
-      optionId: `opt_${Date.now()}`, 
+      _id: `opt_${Date.now()}`, 
       value: `Option ${(localQuestion.options?.length || 0) + 1}` 
     }];
     handleFieldChange('options', newOptions);
@@ -39,6 +40,20 @@ const QuestionEditor = ({
       const newOptions = localQuestion.options.filter((_, i) => i !== optionIndex);
       handleFieldChange('options', newOptions);
     }
+  };
+
+  const handleDuplicate = () => {
+    // Create a copy of the question with a new ID
+    const duplicatedQuestion = {
+      ...localQuestion,
+      _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      question: `${localQuestion.question} (Copy)`,
+      options: localQuestion.options?.map(opt => ({
+        ...opt,
+        _id: `opt_${Date.now()}_${Math.random()}`
+      }))
+    };
+    onDuplicate(duplicatedQuestion);
   };
 
   const getQuestionTypeLabel = (type) => {
@@ -62,7 +77,7 @@ const QuestionEditor = ({
           <span className="question-number">{index + 1}</span>
           <div className="question-info">
             <span className="question-title">
-              {localQuestion.questionText || 'Untitled Question'}
+              {localQuestion.question || 'Untitled Question'}
             </span>
             <span className="question-type-badge">
               {getQuestionTypeLabel(localQuestion.type)}
@@ -93,16 +108,6 @@ const QuestionEditor = ({
           >
             ↓
           </button>
-          <button
-            className="icon-button delete"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete();
-            }}
-            title="Delete Question"
-          >
-            🗑️
-          </button>
           <span className="expand-indicator">
             {isExpanded ? '▼' : '▶'}
           </span>
@@ -114,8 +119,8 @@ const QuestionEditor = ({
           <div className="question-form">
             <Input
               label="Question Text"
-              value={localQuestion.questionText}
-              onChange={(e) => handleFieldChange('questionText', e.target.value)}
+              value={localQuestion.question || ''}
+              onChange={(e) => handleFieldChange('question', e.target.value)}
               placeholder="Enter your question"
               required
             />
@@ -132,10 +137,11 @@ const QuestionEditor = ({
                   // Set default options for choice type
                   if (newType === 'choice' && !localQuestion.options) {
                     updated.options = [
-                      { optionId: 'opt_1', value: 'Option 1' },
-                      { optionId: 'opt_2', value: 'Option 2' }
+                      { _id: 'opt_1', value: 'Option 1' },
+                      { _id: 'opt_2', value: 'Option 2' }
                     ];
-                    updated.singleChoice = true;
+                    updated.single_choice = true;
+                    updated.multiple_choice = false;
                   }
                   
                   // Set format for date picker
@@ -143,11 +149,11 @@ const QuestionEditor = ({
                     updated.format = 'MM/DD/YYYY';
                   }
                   
-                  // Set maxLength for text types
-                  if (newType === 'short_text') {
-                    updated.maxLength = 100;
-                  } else if (newType === 'long_text') {
-                    updated.maxLength = 500;
+                  // Clear options for non-choice types
+                  if (newType !== 'choice') {
+                    updated.options = [];
+                    updated.single_choice = false;
+                    updated.multiple_choice = false;
                   }
                   
                   setLocalQuestion(updated);
@@ -163,27 +169,7 @@ const QuestionEditor = ({
               </Input>
             </div>
 
-            <div className="question-settings">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={localQuestion.required || false}
-                  onChange={(e) => handleFieldChange('required', e.target.checked)}
-                />
-                <span>Required field</span>
-              </label>
-
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={localQuestion.descriptionEnabled || false}
-                  onChange={(e) => handleFieldChange('descriptionEnabled', e.target.checked)}
-                />
-                <span>Add description</span>
-              </label>
-            </div>
-
-            {localQuestion.descriptionEnabled && (
+            {localQuestion.description_enabled && (
               <Input
                 type="textarea"
                 label="Description"
@@ -205,7 +191,7 @@ const QuestionEditor = ({
                 
                 <div className="options-list">
                   {(localQuestion.options || []).map((option, optionIndex) => (
-                    <div key={option.optionId || optionIndex} className="option-item">
+                    <div key={option._id || optionIndex} className="option-item">
                       <span className="option-number">{optionIndex + 1}.</span>
                       <Input
                         value={option.value}
@@ -225,6 +211,52 @@ const QuestionEditor = ({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Bottom Actions Bar */}
+          <div className="question-bottom-actions">
+            {/* Action Buttons on the left */}
+            <div className="action-buttons-group">
+              <button
+                className="action-button copy"
+                onClick={handleDuplicate}
+                title="Duplicate Question"
+              >
+                <span className="action-icon">📋</span>
+                <span className="action-text">Copy</span>
+              </button>
+              <button
+                className="action-button delete"
+                onClick={onDelete}
+                title="Delete Question"
+              >
+                <span className="action-icon">🗑️</span>
+                <span className="action-text">Delete</span>
+              </button>
+            </div>
+
+            {/* Toggle Switches on the right */}
+            <div className="toggle-group">
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={localQuestion.required || false}
+                  onChange={(e) => handleFieldChange('required', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+                <span className="toggle-label">Required</span>
+              </label>
+
+              <label className="toggle-switch">
+                <input
+                  type="checkbox"
+                  checked={localQuestion.description_enabled || false}
+                  onChange={(e) => handleFieldChange('description_enabled', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
+                <span className="toggle-label">Description</span>
+              </label>
+            </div>
           </div>
         </div>
       )}

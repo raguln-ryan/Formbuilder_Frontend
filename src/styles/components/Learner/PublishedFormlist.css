@@ -1,0 +1,96 @@
+.published-form-list {
+  padding: 20px;
+}
+
+.forms-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.form-card {
+  background: white;
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.form-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.form-card-header {
+  background: #f8f9fa;
+  padding: 15px;
+  border-bottom: 1px solid #e9ecef;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-card-header h3 {
+  margin: 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.question-count {
+  background: #007bff;
+  color: white;
+  padding: 4px 8px;
+  border-radius: 15px;
+  font-size: 12px;
+}
+
+.form-card-body {
+  padding: 15px;
+}
+
+.form-description {
+  color: #666;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.form-card-footer {
+  padding: 15px;
+  border-top: 1px solid #e9ecef;
+}
+
+.fill-form-btn {
+  width: 100%;
+  padding: 10px;
+  background: #28a745;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  transition: background 0.3s;
+}
+
+.fill-form-btn:hover {
+  background: #218838;
+}
+
+.no-forms {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.no-forms h3 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+.no-forms p {
+  color: #666;
+}
