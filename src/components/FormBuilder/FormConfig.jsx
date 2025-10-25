@@ -14,6 +14,7 @@ const FormConfig = ({
   const isFormValid = formData.title.trim() && formData.description.trim();
 
   return (
+    <div className="form-editor-content-area">
     <div className="form-config-wrapper">
       <div className="form-config-content-box">
         <div className="form-details-header">
@@ -71,6 +72,7 @@ const FormConfig = ({
           Next
         </button>
       </div>
+    </div>
     </div>
   );
 };

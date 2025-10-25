@@ -355,3 +355,7 @@
   cursor: pointer;
   color: #666;
 }
+
+.form-config-content-box{
+  height: calc(100vh - 200px);
+}

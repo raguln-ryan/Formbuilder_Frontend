@@ -76,6 +76,17 @@ const formService = {
       console.error('Error publishing form:', error);
       throw error;
     }
+  },
+
+  // Add this method to your formService
+  toggleFormStatus: async (formId, isEnabled) => {
+    try {
+      const response = await api.put(`/Form/${formId}/toggle`, { isEnabled });
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling form status:', error);
+      throw error;
+    }
   }
 };
 

@@ -291,7 +291,7 @@ const FormEditor = ({ formId }) => {
         </div>
 
         {/* Content area */}
-        <div className="form-editor-content-area">
+        {/* <div className="form-editor-content-area"> */}
           {activeTab === 'config' ? (
             <FormConfig
               formData={formData}
@@ -315,7 +315,7 @@ const FormEditor = ({ formId }) => {
           )}
         </div>
       </div>
-    </div>
+    // </div>
   );
 };
 

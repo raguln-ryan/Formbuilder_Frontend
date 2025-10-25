@@ -68,7 +68,22 @@ const QuestionEditor = ({
     return types[type] || type;
   };
 
+  const getQuestionTypeDescription = (type) => {
+    const descriptions = {
+      short_text: 'Upto 100 Characters',
+      long_text: 'Upto 500 Characters',
+      number: 'Numeric input only',
+      date_picker: 'DD/MM/YY',
+      choice: 'Dropdown selection',
+      file_upload: 'One file allowed'
+    };
+    return descriptions[type] || '';
+  };
+
   const hasOptions = localQuestion.type === 'choice';
+  const isDatePicker = localQuestion.type === 'date_picker';
+  const isFileUpload = localQuestion.type === 'file_upload';
+  const isDropdown = localQuestion.type === 'choice';
 
   return (
     <div className={`question-editor ${isExpanded ? 'expanded' : 'collapsed'}`}>
@@ -125,49 +140,63 @@ const QuestionEditor = ({
               required
             />
 
-            <div className="form-row">
-              <Input
-                type="select"
-                label="Question Type"
-                value={localQuestion.type}
-                onChange={(e) => {
-                  const newType = e.target.value;
-                  const updated = { ...localQuestion, type: newType };
-                  
-                  // Set default options for choice type
-                  if (newType === 'choice' && !localQuestion.options) {
-                    updated.options = [
-                      { _id: 'opt_1', value: 'Option 1' },
-                      { _id: 'opt_2', value: 'Option 2' }
-                    ];
-                    updated.single_choice = true;
-                    updated.multiple_choice = false;
-                  }
-                  
-                  // Set format for date picker
-                  if (newType === 'date_picker') {
-                    updated.format = 'MM/DD/YYYY';
-                  }
-                  
-                  // Clear options for non-choice types
-                  if (newType !== 'choice') {
-                    updated.options = [];
-                    updated.single_choice = false;
-                    updated.multiple_choice = false;
-                  }
-                  
-                  setLocalQuestion(updated);
-                  onUpdate(updated);
-                }}
-              >
-                <option value="short_text">Short Text</option>
-                <option value="long_text">Long Text</option>
-                <option value="number">Number</option>
-                <option value="date_picker">Date Picker</option>
-                <option value="choice">Dropdown</option>
-                <option value="file_upload">File Upload</option>
-              </Input>
+            {/* Question Type Display - Disabled */}
+            <div className="question-type-display">
+              <label className="type-label">Question Type</label>
+              <div className="type-info-box">
+                <div className="type-name">
+                  {getQuestionTypeLabel(localQuestion.type)}
+                </div>
+                <div className="type-description">
+                  {getQuestionTypeDescription(localQuestion.type)}
+                </div>
+              </div>
             </div>
+
+            
+
+            {/* Selection Type for Dropdown */}
+            {isDropdown && (
+              <div className="form-row">
+                <label className="selection-type-label">Selection Type</label>
+                <div className="selection-type-group">
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name={`selection-type-${index}`}
+                      value="single"
+                      checked={localQuestion.selection_type !== 'multiple'}
+                      onChange={() => handleFieldChange('selection_type', 'single')}
+                    />
+                    <span>Single Select</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name={`selection-type-${index}`}
+                      value="multiple"
+                      checked={localQuestion.selection_type === 'multiple'}
+                      onChange={() => handleFieldChange('selection_type', 'multiple')}
+                    />
+                    <span>Multi Select</span>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* File Upload Configuration */}
+            {isFileUpload && (
+              <div className="file-config-info">
+                <div className="file-info-item">
+                  <span className="info-icon">📎</span>
+                  <span className="info-text">Supported files: PDF, PNG, JPG</span>
+                </div>
+                <div className="file-info-item">
+
+                  <span className="info-text">Max file size: 2 MB</span>
+                </div>
+              </div>
+            )}
 
             {localQuestion.description_enabled && (
               <Input
@@ -223,7 +252,6 @@ const QuestionEditor = ({
                 title="Duplicate Question"
               >
                 <span className="action-icon">📋</span>
-                <span className="action-text">Copy</span>
               </button>
               <button
                 className="action-button delete"
@@ -231,7 +259,6 @@ const QuestionEditor = ({
                 title="Delete Question"
               >
                 <span className="action-icon">🗑️</span>
-                <span className="action-text">Delete</span>
               </button>
             </div>
 

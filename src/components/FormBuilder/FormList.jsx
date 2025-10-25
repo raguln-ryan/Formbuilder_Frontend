@@ -148,6 +148,21 @@ const FormList = () => {
     setActiveMenu(null);
   };
 
+  const handleToggleEnable = async (formId) => {
+    try {
+      const form = forms.find(f => (f.formId || f._id) === formId);
+      const newEnabledStatus = !form.isEnabled;
+    
+      // Update the form's enabled status
+      await formService.updateFormStatus(formId, { isEnabled: newEnabledStatus });
+    
+      // Refresh the forms list
+      fetchForms();
+    } catch (error) {
+      console.error('Error toggling form status:', error);
+    }
+  };
+
   if (loading) return <LoadingSpinner />;
 
   if (error) {
@@ -201,7 +216,7 @@ const FormList = () => {
               className="create-form-btn"
               onClick={() => navigate('/form/new')}
             >
-               Create Form
+              Create Form
             </button>
           )}
         </div>
@@ -221,42 +236,51 @@ const FormList = () => {
                 </button>
                 {activeMenu === (form.formId || form._id) && (
                   <div className="dropdown-menu">
-                    <button
-                      onClick={() => handleEdit(form.formId || form._id)}
-                      disabled={form.status === 1}
-                      className="dropdown-item"
-                    >
-                      Edit
-                    </button>
-                    {form.status === 0 && (
-                      <button
-                        onClick={() => handlePublish(form.formId || form._id)}
-                        className="dropdown-item"
-                      >
-                        Publish
-                      </button>
+                    {form.status === 0 ? (
+                      // Draft status - show Edit, Publish, Delete
+                      <>
+                        <button
+                          onClick={() => handleEdit(form.formId || form._id)}
+                          className="dropdown-item"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handlePublish(form.formId || form._id)}
+                          className="dropdown-item"
+                        >
+                          Publish
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(form.formId || form._id)}
+                          className="dropdown-item delete"
+                        >
+                          Delete
+                        </button>
+                      </>
+                    ) : (
+                      // Published status - show View Form, Delete
+                      <>
+                        <button
+                          onClick={() => handleViewForm(form.formId || form._id)}
+                          className="dropdown-item"
+                        >
+                          View Form
+                        </button>
+                        <button
+                          onClick={() => handleDeleteClick(form.formId || form._id)}
+                          className="dropdown-item delete"
+                        >
+                          Delete
+                        </button>
+                      </>
                     )}
-                    {form.status === 1 && (
-                      <button
-                        onClick={() => handleShare(form.formId || form._id)}
-                        className="dropdown-item"
-                      >
-                        📤 Share Form
-                      </button>
-                    )}
-                    <hr className="dropdown-divider" />
-                    <button
-                      onClick={() => handleDeleteClick(form.formId || form._id)}
-                      className="dropdown-item delete"
-                    >
-                      Delete
-                    </button>
                   </div>
                 )}
               </div>
 
               <div className="form-card-content">
-               
+
                 <h3 className="form-name">{form.title || 'Untitled Form'}</h3>
 
                 <div className="form-details">
@@ -286,26 +310,44 @@ const FormList = () => {
                         <span className="form-detail-label">Published date:</span>
                         <span>
                           {form.publishedDate
-                            ? new Date(form.publishedDate).toLocaleDateString()
-                            : 'N/A'}
+                            ? new Date(form.createdDate).toLocaleDateString()
+                            : new Date().toLocaleDateString()}
                         </span>
                       </div>
-                      
+
                     </>
                   )}
                 </div>
-                <hr/>
+                
                 <div className="form-card-footer">
                   <button className={`status-badge status-${form.status === 0 ? 'draft' : 'published'}`}>
                     {form.status === 0 ? 'Draft' : 'Published'}
                   </button>
+
+                  {form.status === 1 && (
+                    <div className="toggle-container">
+                      <span className="toggle-label">Enabled</span>
+                      <label className="toggle-switch">
+                        <input
+                          type="checkbox"
+                          checked={form.isEnabled || false}
+                          onChange={() => handleToggleEnable(form.formId || form._id)}
+                        />
+                        <span className="toggle-slider"></span>
+                      </label>
+                    </div>
+                  )}
+
                   <button
-                    className="view-responses-btn"
-                    onClick={() => handleViewResponses(form.formId || form._id)}
+                    className={`view-responses-btn ${form.status === 0 ? 'disabled' : ''}`}
+                    onClick={() => form.status === 1 && handleViewResponses(form.formId || form._id)}
+                    disabled={form.status === 0}
                   >
                     View Responses
                   </button>
                 </div>
+
+
               </div>
             </div>
           ))}
@@ -317,7 +359,7 @@ const FormList = () => {
         onClose={() => setDeleteModal({ isOpen: false, formId: null })}
         onConfirm={handleDelete}
         title="Delete Form"
-        message="Are you sure you want to delete this form? This action cannot be undone."
+        message="Are you sure you want to delete this form? This will permanently remove all related data and cannot be undone."
         variant="danger"
       />
     </div>

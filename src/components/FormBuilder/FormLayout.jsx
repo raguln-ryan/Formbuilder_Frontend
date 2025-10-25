@@ -18,6 +18,7 @@ const FormLayout = ({
   };
 
   return (
+    <div className="form-editor-content-area1">
     <div className="form-layout-wrapper">
       {showPreview ? (
         <div className="preview-modal">
@@ -36,7 +37,6 @@ const FormLayout = ({
       ) : null}
       
       <div className="form-config-content-box">
-        
         
         <SectionEditor 
           questions={questions}
@@ -71,6 +71,7 @@ const FormLayout = ({
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 };

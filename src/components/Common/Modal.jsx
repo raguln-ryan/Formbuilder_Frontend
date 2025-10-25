@@ -14,24 +14,25 @@ const Modal = ({
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{title}</h3>
-          <button className="modal-close" onClick={onClose}>×</button>
-        </div>
-        <div className="modal-body">
-          <p>{message}</p>
-        </div>
-        <div className="modal-footer">
-          <Button variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button variant={variant === 'danger' ? 'danger' : 'primary'} onClick={onConfirm}>
-            Confirm
-          </Button>
-        </div>
-      </div>
+  <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-header">
+      <h3>{title}</h3>
+      <button className="modal-close" onClick={onClose}></button>
     </div>
+    <div className="modal-body">
+      <p>{message}</p>
+    </div>
+    <div className="modal-footer">
+      <button className="cancel-btn" onClick={onClose}>
+        Cancel
+      </button>
+      <button className="confirm-btn" onClick={onConfirm}>
+        Yes, Delete
+      </button>
+    </div>
+  </div>
+</div>
+
   );
 };
 

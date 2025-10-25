@@ -2,17 +2,23 @@ import React, { useState } from 'react';
 import QuestionEditor from './QuestionEditor';
 import { generateId } from '../../utils/helpers';
 import '../../styles/components/FormBuilder/SectionEditor.css';
+import shorttext from './../../assets/shorttext.png'
+import longtext from './../../assets/longtext.png'
+import fileupload from './../../assets/fileupload.png'
+import numeric from './../../assets/numeric.png'
+import calendar from './../../assets/calendar.png'
+import dropdown from './../../assets/dropdown.png'
 
 const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescription }) => {
   const [draggedOver, setDraggedOver] = useState(null);
 
   const fieldTypes = [
-    { type: 'short_text', label: 'Short Text', icon: '📝' },
-    { type: 'long_text', label: 'Long Text', icon: '📄' },
-    { type: 'date_picker', label: 'Date Picker', icon: '📅' },
-    { type: 'choice', label: 'Dropdown', icon: '📋' },
-    { type: 'file_upload', label: 'File Upload', icon: '📁' },
-    { type: 'number', label: 'Number', icon: '🔢' }
+    { type: 'short_text', label: 'Short Text', icon: shorttext },
+    { type: 'long_text', label: 'Long Text', icon: longtext },
+    { type: 'date_picker', label: 'Date Picker', icon: calendar },
+    { type: 'choice', label: 'Dropdown', icon: dropdown },
+    { type: 'file_upload', label: 'File Upload', icon: fileupload },
+    { type: 'number', label: 'Number', icon: numeric }
   ];
 
   const handleDragStart = (e, fieldType) => {
@@ -109,6 +115,7 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
   return (
     <div className="section-editor">
       <div className="section-editor-sidebar">
+        
         <h3 className="sidebar-title">Input Fields</h3>
 
 
@@ -120,7 +127,8 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
               draggable
               onDragStart={(e) => handleDragStart(e, field)}
             >
-              <span className="field-icon">{field.icon}</span>
+              {/* <span className="field-icon">{field.icon}</span> */}
+              <img src={field.icon} alt='' style={{width: 24, height: 24}}/>
               <div className="field-info">
                 <span className="field-label">{field.label}</span>
                 <span className="field-description">{field.description}</span>
