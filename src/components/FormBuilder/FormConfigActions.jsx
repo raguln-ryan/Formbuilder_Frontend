@@ -2,31 +2,30 @@ import React from 'react';
 import Button from '../Common/Button';
 import '../../styles/components/FormBuilder/FormConfigActions.css';
 
-const FormConfigActions = ({ 
-  onSaveAsDraft, 
-  onNext, 
-  saving, 
-  isValid 
+const FormConfigActions = ({
+  onSaveAsDraft,
+  onNext,
+  saving,
+  isValid
 }) => {
   return (
     <div className="form-config-actions-floating">
-      <Button 
-        variant="secondary"
+      <button
+        className="save-draft-btn"
         onClick={onSaveAsDraft}
-        loading={saving}
-        disabled={!isValid}
+        disabled={!isValid || saving}
       >
         Save as Draft
-      </Button>
-      <Button 
-        variant="primary"
+      </button>
+      <button
+        className="next-btn"
         onClick={onNext}
-        loading={saving}
-        disabled={!isValid}
+        disabled={!isValid || saving}
       >
         Next
-      </Button>
+      </button>
     </div>
+
   );
 };
 
