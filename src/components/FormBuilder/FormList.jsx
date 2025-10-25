@@ -80,14 +80,12 @@ const FormList = () => {
     }
   };
 
+  // Update handlePublish function
   const handlePublish = async (formId) => {
-    try {
-      await formService.publishForm(formId);
-      fetchForms();
-    } catch (error) {
-      console.error('Error publishing form:', error);
-    }
+    setPublishModal({ isOpen: true, formId });
+    setActiveMenu(null);
   };
+
 
   const toggleMenu = (formId, e) => {
     e.stopPropagation();
@@ -152,10 +150,10 @@ const FormList = () => {
     try {
       const form = forms.find(f => (f.formId || f._id) === formId);
       const newEnabledStatus = !form.isEnabled;
-    
+
       // Update the form's enabled status
       await formService.updateFormStatus(formId, { isEnabled: newEnabledStatus });
-    
+
       // Refresh the forms list
       fetchForms();
     } catch (error) {
@@ -318,7 +316,7 @@ const FormList = () => {
                     </>
                   )}
                 </div>
-                
+
                 <div className="form-card-footer">
                   <button className={`status-badge status-${form.status === 0 ? 'draft' : 'published'}`}>
                     {form.status === 0 ? 'Draft' : 'Published'}
@@ -362,6 +360,8 @@ const FormList = () => {
         message="Are you sure you want to delete this form? This will permanently remove all related data and cannot be undone."
         variant="danger"
       />
+
+
     </div>
   );
 };
