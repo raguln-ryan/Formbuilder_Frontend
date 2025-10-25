@@ -3,11 +3,11 @@ import QuestionEditor from './QuestionEditor';
 import { generateId } from '../../utils/helpers';
 import '../../styles/components/FormBuilder/FormBuilderCanvas.css';
 
-const FormBuilderCanvas = ({ 
-  questions, 
-  onQuestionsChange, 
-  formTitle, 
-  formDescription 
+const FormBuilderCanvas = ({
+  questions,
+  onQuestionsChange,
+  formTitle,
+  formDescription
 }) => {
   const [draggedOver, setDraggedOver] = useState(false);
 
@@ -99,14 +99,15 @@ const FormBuilderCanvas = ({
     <div className="form-builder-canvas">
       {/* Header Section */}
       <div className="form-header-section">
+        <div className="form-header-label">Header</div>
         <div className="form-header-card">
-          <div className="form-header-label">Header</div>
           <div className="form-header-content">
             <h2 className="form-title">{formTitle || 'Untitled Form'}</h2>
             <p className="form-description">{formDescription || 'No description available'}</p>
           </div>
         </div>
       </div>
+
 
       {/* Drag and Drop Section */}
       <div className="drag-drop-section">
@@ -118,8 +119,7 @@ const FormBuilderCanvas = ({
         >
           {questions.length === 0 ? (
             <div className="empty-state">
-              <div className="empty-icon">➕</div>
-              <p>Drag field from the left panel</p>
+              {/* Add icon here */}
             </div>
           ) : (
             <div className="questions-container">

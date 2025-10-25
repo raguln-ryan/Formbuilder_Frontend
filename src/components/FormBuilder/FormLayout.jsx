@@ -36,7 +36,7 @@ const FormLayout = ({
         </div>
       ) : null}
       
-      <div className="form-config-content-box">
+      
         
         <SectionEditor 
           questions={questions}
@@ -44,7 +44,7 @@ const FormLayout = ({
           formTitle={formData.title}
           formDescription={formData.description}
         />
-      </div>
+      
       
       <div className="form-config-actions-wrapper">
         <button 

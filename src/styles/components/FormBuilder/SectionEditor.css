@@ -3,17 +3,31 @@
   height: 100%;
   width: 100%;
   background: #F5F5F5;
+  gap: 20px;
 }
 
 .section-editor-left {
-  width: 280px;
+  width: 332px;
+  height: 706px;
+  gap: 10px;
+  transform: rotate(0deg);
+  opacity: 1;
+  padding: 16px 24px;
+  border-radius: 16px;
   background: #FFFFFF;
   border-right: 1px solid #E0E0E0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
 }
 
+
 .section-editor-right {
-  flex: 1;
-  overflow-y: auto;
+  width: 996px;
+  height: 706px;
+  border-radius: 16px;
+  border: 1px solid #DBDBDB;
+  background-color: #EEEEEE;
   padding: 20px;
+  flex: 1;
 }
+
