@@ -1,0 +1,46 @@
+.fields-sidebar {
+  padding: 20px;
+}
+
+.sidebar-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #262626;
+  margin-bottom: 20px;
+}
+
+.field-types-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.field-type-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #E0E0E0;
+  border-radius: 8px;
+  cursor: grab;
+  transition: all 0.2s;
+}
+
+.field-type-item:hover {
+  background: #F5F5F5;
+  border-color: #5D38DF;
+}
+
+.field-type-item:active {
+  cursor: grabbing;
+}
+
+.field-icon {
+  width: 24px;
+  height: 24px;
+}
+
+.field-label {
+  font-size: 14px;
+  color: #262626;
+}

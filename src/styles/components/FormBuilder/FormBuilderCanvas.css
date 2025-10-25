@@ -1,0 +1,75 @@
+.form-builder-canvas {
+  width: 100%;
+}
+
+.form-header-section {
+  margin-bottom: 20px;
+}
+
+.form-header-card {
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.form-header-label {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 8px;
+}
+
+.form-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #262626;
+  margin: 0 0 8px 0;
+}
+
+.form-description {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.drag-drop-section {
+  background: #FFFFFF;
+  border-radius: 8px;
+  padding: 20px;
+  min-height: 400px;
+}
+
+.drop-zone {
+  min-height: 300px;
+  border: 2px dashed #E0E0E0;
+  border-radius: 8px;
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.drop-zone.dragging {
+  border-color: #5D38DF;
+  background: #F8F6FF;
+}
+
+.drop-zone.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.empty-state {
+  text-align: center;
+  color: #999;
+}
+
+.empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.questions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
