@@ -10,26 +10,26 @@ import '../../styles/components/FormBuilder/FormEditor.css';
 const FormEditor = ({ formId }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
-  
+
   // Authentication check
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'Admin') {
       navigate('/login');
     }
   }, [isAuthenticated, user, navigate]);
-  
+
   const isEdit = formId && formId !== 'new';
-  
+
   const [activeTab, setActiveTab] = useState('config');
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
-  
+
   const [formData, setFormData] = useState({
     title: '',
     description: ''
   });
-  
+
   const [questions, setQuestions] = useState([]);
   const [currentFormId, setCurrentFormId] = useState(null);
 
@@ -65,7 +65,7 @@ const FormEditor = ({ formId }) => {
 
   const validateFormConfig = () => {
     const newErrors = {};
-    
+
     // Title validation
     if (!formData.title.trim()) {
       newErrors.title = 'Form name is required';
@@ -74,7 +74,7 @@ const FormEditor = ({ formId }) => {
     } else if (formData.title.length > TITLE_CHAR_LIMIT) {
       newErrors.title = `Form name cannot exceed ${TITLE_CHAR_LIMIT} characters`;
     }
-    
+
     // Description validation
     if (!formData.description.trim()) {
       newErrors.description = 'Form description is required';
@@ -83,7 +83,7 @@ const FormEditor = ({ formId }) => {
     } else if (formData.description.length > DESCRIPTION_CHAR_LIMIT) {
       newErrors.description = `Form description cannot exceed ${DESCRIPTION_CHAR_LIMIT} characters`;
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -101,7 +101,7 @@ const FormEditor = ({ formId }) => {
       ...prev,
       [field]: value
     }));
-    
+
     // Clear error for this field
     if (errors[field]) {
       setErrors(prev => ({
@@ -113,11 +113,11 @@ const FormEditor = ({ formId }) => {
 
   const handleSaveAsDraft = async () => {
     if (!validateFormConfig()) return;
-    
+
     try {
       setSaving(true);
       let savedFormId = currentFormId;
-      
+
       if (!savedFormId) {
         // Create new form
         const response = await formService.createForm(formData);
@@ -127,7 +127,7 @@ const FormEditor = ({ formId }) => {
         // Update existing form config
         await formService.updateFormConfig(savedFormId, formData);
       }
-      
+
       // Save to localStorage as draft
       const savedForms = JSON.parse(localStorage.getItem('saved_forms') || '[]');
       const formToSave = {
@@ -139,21 +139,21 @@ const FormEditor = ({ formId }) => {
         status: 0,
         savedAt: new Date().toISOString()
       };
-      
+
       const existingIndex = savedForms.findIndex(f => f.formId === savedFormId);
       if (existingIndex >= 0) {
         savedForms[existingIndex] = formToSave;
       } else {
         savedForms.push(formToSave);
       }
-      
+
       localStorage.setItem('saved_forms', JSON.stringify(savedForms));
-      
+
       // Save questions if any exist
       if (questions.length > 0 && savedFormId) {
         await formService.updateForm(savedFormId, { questions });
       }
-      
+
       alert('Form saved as draft successfully!');
     } catch (error) {
       alert('Failed to save form. Please try again.');
@@ -164,10 +164,10 @@ const FormEditor = ({ formId }) => {
 
   const handleNext = async () => {
     if (!validateFormConfig()) return;
-    
+
     try {
       setSaving(true);
-      
+
       if (!currentFormId) {
         // Create form first
         const response = await formService.createForm(formData);
@@ -176,7 +176,7 @@ const FormEditor = ({ formId }) => {
         // Update form config
         await formService.updateFormConfig(currentFormId, formData);
       }
-      
+
       setActiveTab('layout');
     } catch (error) {
       alert('Failed to save form configuration.');
@@ -190,15 +190,15 @@ const FormEditor = ({ formId }) => {
       alert('Please save form configuration first');
       return;
     }
-    
+
     if (questions.length === 0) {
       alert('Please add at least one question');
       return;
     }
-    
+
     try {
       setSaving(true);
-      
+
       // Save to localStorage
       const savedForms = JSON.parse(localStorage.getItem('saved_forms') || '[]');
       const formToSave = {
@@ -210,16 +210,16 @@ const FormEditor = ({ formId }) => {
         status: 0,
         savedAt: new Date().toISOString()
       };
-      
+
       const existingIndex = savedForms.findIndex(f => f.formId === currentFormId);
       if (existingIndex >= 0) {
         savedForms[existingIndex] = formToSave;
       } else {
         savedForms.push(formToSave);
       }
-      
+
       localStorage.setItem('saved_forms', JSON.stringify(savedForms));
-      
+
       await formService.updateForm(currentFormId, { questions });
       alert('Form saved as draft successfully!');
     } catch (error) {
@@ -234,24 +234,23 @@ const FormEditor = ({ formId }) => {
       alert('Please save form first');
       return;
     }
-    
+
     if (!questions || questions.length === 0) {
       alert('Cannot publish form without questions. Please add at least one question.');
       return;
     }
-    
+
     try {
       setSaving(true);
-      
+
       // Update form with questions
       await formService.updateForm(currentFormId, { questions });
-      
+
       // Publish the form
       await formService.publishForm(currentFormId);
-      
-      const publicUrl = `${window.location.origin}/form/${currentFormId}`;
-      alert(`✅ Form published successfully!\n\nPublic link: ${publicUrl}`);
-      
+
+      alert('✅ Form published successfully!');
+
       navigate('/admin');
     } catch (error) {
       alert('Failed to publish form. ' + (error.response?.data?.message || ''));
@@ -259,6 +258,7 @@ const FormEditor = ({ formId }) => {
       setSaving(false);
     }
   };
+
 
   const handleQuestionsChange = (updatedQuestions) => {
     setQuestions(updatedQuestions);
@@ -285,36 +285,36 @@ const FormEditor = ({ formId }) => {
               onClick={() => currentFormId || formData.title ? setActiveTab('layout') : null}
               disabled={!currentFormId && !formData.title}
             >
-              Form Layout 
+              Form Layout
             </button>
           </div>
         </div>
 
         {/* Content area */}
         {/* <div className="form-editor-content-area"> */}
-          {activeTab === 'config' ? (
-            <FormConfig
-              formData={formData}
-              onInputChange={handleInputChange}
-              onSaveAsDraft={handleSaveAsDraft}
-              onNext={handleNext}
-              errors={errors}
-              saving={saving}
-              TITLE_CHAR_LIMIT={TITLE_CHAR_LIMIT}
-              DESCRIPTION_CHAR_LIMIT={DESCRIPTION_CHAR_LIMIT}
-            />
-          ) : (
-            <FormLayout
-              formData={formData}
-              questions={questions}
-              onQuestionsChange={handleQuestionsChange}
-              onSaveAsDraft={handleSaveLayoutAsDraft}
-              onPublish={handlePublish}
-              saving={saving}
-            />
-          )}
-        </div>
+        {activeTab === 'config' ? (
+          <FormConfig
+            formData={formData}
+            onInputChange={handleInputChange}
+            onSaveAsDraft={handleSaveAsDraft}
+            onNext={handleNext}
+            errors={errors}
+            saving={saving}
+            TITLE_CHAR_LIMIT={TITLE_CHAR_LIMIT}
+            DESCRIPTION_CHAR_LIMIT={DESCRIPTION_CHAR_LIMIT}
+          />
+        ) : (
+          <FormLayout
+            formData={formData}
+            questions={questions}
+            onQuestionsChange={handleQuestionsChange}
+            onSaveAsDraft={handleSaveLayoutAsDraft}
+            onPublish={handlePublish}
+            saving={saving}
+          />
+        )}
       </div>
+    </div>
     // </div>
   );
 };

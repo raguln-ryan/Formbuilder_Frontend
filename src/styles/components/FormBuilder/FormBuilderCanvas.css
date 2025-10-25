@@ -94,6 +94,7 @@
 
 .drop-zone.empty {
   display: flex;
+  height : 220px;
   background: #F2EFFC;
   align-items: center;
   justify-content: center;
@@ -110,6 +111,30 @@
   font-size: 48px;
   margin-bottom: 16px;
 } */
+ .dragicon {
+  display: flex;
+  flex-direction: row; /* Explicitly set to row */
+  align-items: center; /* Vertically center align */
+  gap: 8px; /* Space between image and text */
+}
+
+
+.drag-image {
+  width: 24px;
+  height: 24px;
+  color: #585561;
+}
+
+.drag-text {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0px;
+  vertical-align: middle;
+  color: #585561;
+}
 
 .questions-container {
   display: flex;

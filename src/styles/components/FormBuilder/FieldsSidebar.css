@@ -64,8 +64,8 @@
 .sidebar-tabs {
   display: flex;
   flex-direction: row; /* Horizontal flow */
-  width: 202px; /* Hug width */
-  height: 40px; /* Hug height */
+  width: 220px; /* Hug width */
+  height: 46px; /* Hug height */
   border-radius: 8px; /* Rounded corners */
   padding: 4px; /* Padding all around */
   gap: 4px; /* Space between tabs */
@@ -77,7 +77,7 @@
 /* Individual tab button */
 .sidebar-tab {
   width: 97px;
-  height: 32px;
+  height: 40px;
   padding: 6px 12px;
   background: #F0F0F0;
   border: none;
@@ -100,8 +100,8 @@
 
 /* Active tab */
 .sidebar-tab.active {
-  width: 97px;
-  height: 32px;
+  width: 106px;
+  height: 40px;
   gap: 10px;
   transform: rotate(0deg);
   opacity: 1;

@@ -23,11 +23,13 @@
 
 .section-editor-right {
   width: 996px;
-  height: 706px;
+  min-height: 706px; /* Changed from height to min-height */
+  max-height: 706px; /* Keep maximum height */
   border-radius: 16px;
   border: 1px solid #DBDBDB;
   background-color: #EEEEEE;
   padding: 20px;
   flex: 1;
+  overflow-y: auto; /* Add scroll when content exceeds */
 }
 

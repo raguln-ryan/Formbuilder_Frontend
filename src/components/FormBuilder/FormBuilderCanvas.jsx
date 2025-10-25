@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import QuestionEditor from './QuestionEditor';
 import { generateId } from '../../utils/helpers';
+import Drag from './../../assets/drag.png';
 import '../../styles/components/FormBuilder/FormBuilderCanvas.css';
 
 const FormBuilderCanvas = ({
@@ -118,9 +119,12 @@ const FormBuilderCanvas = ({
           onDrop={handleDrop}
         >
           {questions.length === 0 ? (
-            <div className="empty-state">
-              {/* Add icon here */}
+            <div className="dragicon">
+              <img src={Drag} alt="drag icon" className="drag-image" />
+              <span className="drag-text">Drag fields from the left panel</span>
             </div>
+
+
           ) : (
             <div className="questions-container">
               {questions.map((question, index) => (
