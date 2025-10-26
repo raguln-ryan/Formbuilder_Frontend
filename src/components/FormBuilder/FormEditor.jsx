@@ -7,6 +7,7 @@ import formService from '../../services/formService';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import '../../styles/components/FormBuilder/FormEditor.css';
 
+
 const FormEditor = ({ formId }) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
@@ -220,7 +221,24 @@ const FormEditor = ({ formId }) => {
 
       localStorage.setItem('saved_forms', JSON.stringify(savedForms));
 
-      await formService.updateForm(currentFormId, { questions });
+      // FIX: Map 'question' field to 'text' for backend
+      const questionsForBackend = questions.map(q => ({
+        id: q._id || q.questionId || q.id,
+        text: q.question || q.questionText || '',  // Map 'question' to 'text'
+        type: q.type,
+        options: q.options?.map(opt => opt.value || opt) || [],
+        required: q.required || false,
+        description: q.description || '',
+        maxLength: q.maxLength || null,
+        enabled: q.enabled !== false,
+        descriptionEnabled: q.description_enabled || q.descriptionEnabled || false,
+        singleChoice: q.singleChoice || false,
+        multipleChoice: q.multipleChoice || false,
+        format: q.format || null,
+        order: q.order || 0
+      }));
+
+      await formService.updateForm(currentFormId, { questions: questionsForBackend });
       alert('Form saved as draft successfully!');
     } catch (error) {
       alert('Failed to save form as draft.');
@@ -243,13 +261,30 @@ const FormEditor = ({ formId }) => {
     try {
       setSaving(true);
 
+      // FIX: Map 'question' field to 'text' for backend
+      const questionsForBackend = questions.map(q => ({
+        id: q._id || q.questionId || q.id,
+        text: q.question || q.questionText || '',  // Map 'question' to 'text'
+        type: q.type,
+        options: q.options?.map(opt => opt.value || opt) || [],
+        required: q.required || false,
+        description: q.description || '',
+        maxLength: q.maxLength || null,
+        enabled: q.enabled !== false,
+        descriptionEnabled: q.description_enabled || q.descriptionEnabled || false,
+        singleChoice: q.singleChoice || false,
+        multipleChoice: q.multipleChoice || false,
+        format: q.format || null,
+        order: q.order || 0
+      }));
+
       // Update form with questions
-      await formService.updateForm(currentFormId, { questions });
+      await formService.updateForm(currentFormId, { questions: questionsForBackend });
 
       // Publish the form
       await formService.publishForm(currentFormId);
 
-      alert('✅ Form published successfully!');
+     
 
       navigate('/admin');
     } catch (error) {

@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import AdminDashboard from './pages/AdminDashboard';
 import FormEditorPage from './pages/FormEditorPage';
+import ViewFormPage from './pages/ViewFormPage';
 
 function App() {
   return (
@@ -41,6 +42,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route path="/form/:formId/view" element={<ViewFormPage />} />
           
           {/* Root path - redirect to login */}
           <Route path="/" element={<Navigate to="/login" replace />} />

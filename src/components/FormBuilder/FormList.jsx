@@ -86,7 +86,6 @@ const FormList = () => {
     setActiveMenu(null);
   };
 
-
   const toggleMenu = (formId, e) => {
     e.stopPropagation();
     setActiveMenu(activeMenu === formId ? null : formId);
@@ -107,42 +106,9 @@ const FormList = () => {
     setActiveMenu(null);
   };
 
-  // Move handleShare inside the component
-  const handleShare = async (formId) => {
-    const publicUrl = `${window.location.origin}/form/${formId}`;
-
-    try {
-      // Try to use the modern clipboard API first
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(publicUrl);
-        alert(`✅ Form link copied to clipboard!\n\n${publicUrl}\n\nShare this link for people to fill the form.`);
-      } else {
-        // Fallback for older browsers or non-secure contexts
-        const textArea = document.createElement('textarea');
-        textArea.value = publicUrl;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-
-        try {
-          document.execCommand('copy');
-          alert(`✅ Form link copied to clipboard!\n\n${publicUrl}\n\nShare this link for people to fill the form.`);
-        } catch (err) {
-          // If copy fails, just show the link
-          prompt('Copy this link to share your form:', publicUrl);
-        } finally {
-          document.body.removeChild(textArea);
-        }
-      }
-    } catch (err) {
-      // If all else fails, show the link in a prompt
-      console.error('Failed to copy:', err);
-      prompt('Copy this link to share your form:', publicUrl);
-    }
-
+  const handleViewForm = (formId) => {
+    // Navigate to view form page
+    navigate(`/form/${formId}/view`);
     setActiveMenu(null);
   };
 

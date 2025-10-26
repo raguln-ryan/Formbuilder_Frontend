@@ -46,14 +46,14 @@ const formService = {
   },
 
   // Update form layout (questions)
-  updateForm: async (id, layoutData) => {
-    try {
-      const response = await api.put(`/Form/Layout/${id}`, layoutData);
-      return response.data;
-    } catch (error) {
-      console.error('Error updating form layout:', error);
-      throw error;
-    }
+  updateForm: async (formId, formData) => {
+    console.log('FormService: Data received:', formData);
+    console.log('FormService: Questions being sent:', formData.questions);
+    
+    const response = await api.put(`/Form/Layout/${formId}`, formData);
+    
+    console.log('FormService: Response from backend:', response.data);
+    return response.data;
   },
 
   // Delete form

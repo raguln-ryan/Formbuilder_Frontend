@@ -1,0 +1,605 @@
+/* Only add CSS for new elements not in FormEditor */
+
+/* Tab Navigation */
+.form-tabs-header {
+  background: white;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 0 40px;
+  margin-bottom: 0;
+}
+
+.form-tabs {
+  display: flex;
+  width:1360px;
+height :72px;
+  gap: 40px;
+  height: 56px;
+  align-items: center;
+}
+
+.form-tab {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  height: 100%;
+  position: relative;
+  transition: color 0.2s;
+}
+
+.form-tab:hover {
+  color: #333;
+}
+
+.form-tab.active {
+  color: #5D38DF;
+}
+
+.form-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: #5D38DF;
+}
+
+
+/* Responses Main Container */
+.responses-main-container {
+  width: 1680.89px;
+  height: 726px;
+  opacity: 1;
+  gap: 16px;
+  border-radius: 16px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Responses Header */
+.responses-header {
+  width: 1680.89px;
+  height: 72px;
+  opacity: 1;
+  gap: 16px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-top: 16px;
+  padding-bottom: 16px;
+  display: flex;
+  align-items: center;
+}
+
+/* Tabs Container */
+.responses-tabs-container {
+  width: 356px;
+  height: 40px;
+  opacity: 1;
+  gap: 24px;
+  padding-right: 24px;
+  padding-left: 24px;
+}
+
+/* Responses Tabs */
+.responses-tabs {
+  width: 480px;
+  height: 52px;
+  opacity: 1;
+  gap: 24px;
+  display: flex;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 4px;
+}
+
+/* Tab Item */
+.response-tab-item {
+  flex: 1;
+  display: flex;
+  position: relative;
+  cursor: pointer;
+}
+
+.response-tab-item input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* Tab Label */
+.tab-label {
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #666;
+  background: transparent;
+  transition: all 0.3s ease;
+  cursor: pointer;
+}
+
+/* Response Summary Tab */
+.tab-label.response-summary-tab {
+  width: 230px;
+  height : 40px;
+
+}
+
+/* Individual Responses Tab */
+.tab-label.individual-responses-tab {
+  width: 230px;
+  height : 40px;
+  
+}
+
+/* Active State */
+.response-tab-item input[type="radio"]:checked + .tab-label {
+  background: #5D38DF;
+  color: white;
+}
+
+/* Hover State */
+.response-tab-item:hover .tab-label:not(.response-tab-item input[type="radio"]:checked + .tab-label) {
+  background: rgba(93, 56, 223, 0.1);
+}
+
+/* Toolbar Section */
+.responses-toolbar {
+  width: 1680.89px;
+  height: 56px;
+  opacity: 1;
+  gap: 20px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+/* Toolbar Content */
+.toolbar-content {
+  width: 1311.998px;
+  height: 40px;
+  opacity: 1;
+  border: 1px solid transparent;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+}
+
+/* Search Container */
+.search-container {
+  width: 320px;
+  height: 40px;
+  position: relative;
+}
+
+.response-search-input {
+  width: 100%;
+  height: 100%;
+  opacity: 1;
+  border-radius: 8px;
+  border: 1px solid #d8d8d8;
+  padding: 0 16px;
+  font-size: 14px;
+}
+
+/* Toolbar Actions */
+.toolbar-actions {
+  width: 706.225px;
+  height: 40px;
+  opacity: 1;
+  gap: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Filter Button */
+.filter-button {
+  width: 87px;
+  height: 40px;
+  opacity: 1;
+  gap: 4px;
+  padding: 5px 16px 5px 12px;
+  border-radius: 8px;
+  border: 1px solid #d8d8d8;
+  background: white;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+
+/* Export Button */
+.export-button {
+  width: 142px;
+  height: 40px;
+  opacity: 1;
+  gap: 10px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  background: #5D38DF;
+  color: white;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Content Area */
+.responses-content-area {
+  width: 598px;
+  height: 472px;
+  opacity: 1;
+  gap: 32px;
+  margin: 32px auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Empty Responses Container */
+.empty-responses-container {
+  width: 598px;
+  height: 472px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+}
+
+/* Empty Image */
+.empty-responses-image {
+  width: 598px;
+  height: 472px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Image composition for empty state */
+.image-composition {
+  position: relative;
+  width: 364px;
+  height: 364px;
+  margin: 0 auto;
+}
+
+.empty-state-round {
+  width: 364px;
+  height: 364px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  opacity: 1;
+  z-index: 1;
+}
+
+.empty-state-speechbubble {
+  width: 177.41px;
+  height: 142.35px;
+  position: absolute;
+  top: 78px;
+  left: 104x;
+  opacity: 1;
+  z-index: 2;
+}
+
+.empty-state-character1 {
+  width: 37px;
+  height: 142.08px;
+  position: absolute;
+  top: 138px;
+  left: 211.04px;
+  z-index: 3;
+}
+
+.empty-state-character2 {
+  width: 154.13px;
+  height: 177.01px;
+  position: absolute;
+  top: 104.38px;
+  left: 92.54px;
+  opacity: 1;
+  z-index: 4;
+}
+
+
+
+.placeholder-image {
+  font-size: 120px;
+  color: #e0e0e0;
+}
+
+/* Empty Text */
+.empty-responses-text {
+  width: 598px;
+  height: 76px;
+  opacity: 1;
+  gap: 12px;
+  text-align: center;
+}
+
+.empty-responses-text h3 {
+  margin: 0 0 12px 0;
+  font-size: 20px;
+  color: #333;
+  font-weight: 600;
+}
+
+.empty-responses-text p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+/* Responses Data */
+.responses-data {
+  width: 100%;
+  padding: 20px;
+}
+
+.response-row {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+/* Response Summary Table */
+.response-summary-content {
+  width: 100%;
+  padding: 20px 40px;
+}
+
+.response-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.response-table th,
+.response-table td {
+  text-align: left;
+  padding: 12px 16px;
+  border: 1px solid #e0e0e0;
+}
+
+.response-table thead {
+  background-color: #f3f4f6;
+}
+
+.response-table th {
+  font-weight: 600;
+  color: #374151;
+}
+
+.view-response-button {
+  color: #5D38DF;
+  text-decoration: underline;
+  font-size: 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.view-response-button:hover {
+  color: #4a2bb3;
+}
+
+/* Pagination */
+.pagination-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding: 16px 0;
+  font-size: 14px;
+}
+
+.pagination-left,
+.pagination-right {
+  color: #666;
+}
+
+.pagination-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.page-nav-button {
+  padding: 4px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.page-info {
+  color: #374151;
+}
+
+/* Individual Empty State */
+.individual-empty-container {
+  width: 598px;
+  margin: 80px auto;
+  text-align: center;
+}
+
+.individual-empty-image {
+  width: 256px;
+  height: 256px;
+  margin: 0 auto 32px;
+}
+
+.illustration-placeholder {
+  width: 100%;
+  height: 100%;
+  background-color: #f3f4f6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 80px;
+  color: #9ca3af;
+}
+
+.individual-empty-text h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #111827;
+}
+
+.individual-empty-text p {
+  font-size: 14px;
+  color: #6b7280;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+/* Individual Responses Layout */
+.responses-layout {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  padding: 0 40px;
+}
+
+.responses-left-panel {
+  width: 280px;
+  border-right: 1px solid #e5e7eb;
+  padding-right: 20px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.response-entry {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.response-entry:hover {
+  background: #f9fafb;
+  border-color: #5D38DF;
+}
+
+.response-date {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.response-title {
+  font-size: 14px;
+  font-weight: 500;
+  margin-top: 4px;
+  color: #111827;
+}
+
+.response-type {
+  font-size: 12px;
+  color: #9ca3af;
+  margin-top: 2px;
+}
+
+.responses-right-panel {
+  flex: 1;
+  padding: 20px;
+}
+
+.form-preview-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #111827;
+}
+
+.form-preview-description {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 32px;
+}
+
+.preview-message {
+  padding: 40px;
+  background: #f9fafb;
+  border-radius: 8px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* Individual Response Detail */
+.individual-response-detail {
+  padding: 24px 40px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.response-detail-header {
+  margin-bottom: 32px;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: #5D38DF;
+  cursor: pointer;
+  font-size: 14px;
+  margin-bottom: 16px;
+  padding: 0;
+}
+
+.response-form-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.response-detail-content {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.response-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.response-field label {
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #374151;
+}
+
+.response-answer {
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #f9fafb;
+  color: #111827;
+  min-height: 40px;
+}
