@@ -2,15 +2,23 @@ import React, { useState } from 'react';
 import Input from '../Common/Input';
 import Button from '../Common/Button';
 import '../../styles/components/FormBuilder/QuestionEditor.css';
+import elements from '../../assets/elements.png';
+import TrashBin from '../../assets/TrashBin.png';
+import Threedot from './../../assets/Threedot.png';
 
-const QuestionEditor = ({ 
-  question, 
-  index, 
-  totalQuestions, 
-  onUpdate, 
-  onDelete, 
+const QuestionEditor = ({
+  question,
+  index,
+  totalQuestions,
+  onUpdate,
+  onDelete,
   onMove,
-  onDuplicate 
+  onDuplicate,
+  onDragStart,
+  onDragEnd,
+  onDragOver,
+  onDrop,
+  isDragging
 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [localQuestion, setLocalQuestion] = useState(question);
@@ -28,9 +36,9 @@ const QuestionEditor = ({
   };
 
   const addOption = () => {
-    const newOptions = [...(localQuestion.options || []), { 
-      _id: `opt_${Date.now()}`, 
-      value: `Option ${(localQuestion.options?.length || 0) + 1}` 
+    const newOptions = [...(localQuestion.options || []), {
+      _id: `opt_${Date.now()}`,
+      value: `Option ${(localQuestion.options?.length || 0) + 1}`
     }];
     handleFieldChange('options', newOptions);
   };
@@ -80,13 +88,49 @@ const QuestionEditor = ({
     return descriptions[type] || '';
   };
 
+  const handleDragStart = (e) => {
+    e.stopPropagation();
+    if (onDragStart) {
+      onDragStart(index);
+    }
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.target.innerHTML);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onDragOver) {
+      onDragOver(e, index);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onDrop) {
+      onDrop(e, index);
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    e.preventDefault();
+    if (onDragEnd) {
+      onDragEnd();
+    }
+  };
+
   const hasOptions = localQuestion.type === 'choice';
   const isDatePicker = localQuestion.type === 'date_picker';
   const isFileUpload = localQuestion.type === 'file_upload';
   const isDropdown = localQuestion.type === 'choice';
 
   return (
-    <div className={`question-editor ${isExpanded ? 'expanded' : 'collapsed'}`}>
+    <div 
+      className={`question-editor ${isExpanded ? 'expanded' : 'collapsed'} ${isDragging ? 'dragging' : ''}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       <div className="question-header" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="question-header-left">
           <span className="question-number">{index + 1}</span>
@@ -99,33 +143,18 @@ const QuestionEditor = ({
             </span>
           </div>
         </div>
-        
+
         <div className="question-header-actions">
-          <button
-            className="icon-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMove('up');
-            }}
-            disabled={index === 0}
-            title="Move Up"
+          <div 
+            className="drag-handle" 
+            title="Drag to reorder"
+            draggable="true"
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onClick={(e) => e.stopPropagation()}
           >
-            ↑
-          </button>
-          <button
-            className="icon-button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onMove('down');
-            }}
-            disabled={index === totalQuestions - 1}
-            title="Move Down"
-          >
-            ↓
-          </button>
-          <span className="expand-indicator">
-            {isExpanded ? '▼' : '▶'}
-          </span>
+            <img src={Threedot} alt="Drag" className="drag-icon" />
+          </div>
         </div>
       </div>
 
@@ -152,8 +181,6 @@ const QuestionEditor = ({
                 </div>
               </div>
             </div>
-
-            
 
             {/* Selection Type for Dropdown */}
             {isDropdown && (
@@ -192,7 +219,6 @@ const QuestionEditor = ({
                   <span className="info-text">Supported files: PDF, PNG, JPG</span>
                 </div>
                 <div className="file-info-item">
-
                   <span className="info-text">Max file size: 2 MB</span>
                 </div>
               </div>
@@ -217,7 +243,7 @@ const QuestionEditor = ({
                     + Add Option
                   </Button>
                 </div>
-                
+
                 <div className="options-list">
                   {(localQuestion.options || []).map((option, optionIndex) => (
                     <div key={option._id || optionIndex} className="option-item">
@@ -244,44 +270,45 @@ const QuestionEditor = ({
 
           {/* Bottom Actions Bar */}
           <div className="question-bottom-actions">
-            {/* Action Buttons on the left */}
-            <div className="action-buttons-group">
+            <div className="actions-right-container">
+              {/* Copy Button */}
               <button
                 className="action-button copy"
                 onClick={handleDuplicate}
                 title="Duplicate Question"
               >
-                <span className="action-icon">📋</span>
+                <img src={elements} alt="Copy" className="action-icon" />
               </button>
+              
+              {/* Delete Button */}
               <button
                 className="action-button delete"
                 onClick={onDelete}
                 title="Delete Question"
               >
-                <span className="action-icon">🗑️</span>
+                <img src={TrashBin} alt="Delete" className="action-icon" />
               </button>
-            </div>
 
-            {/* Toggle Switches on the right */}
-            <div className="toggle-group">
-              <label className="toggle-switch">
-                <input
-                  type="checkbox"
-                  checked={localQuestion.required || false}
-                  onChange={(e) => handleFieldChange('required', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-                <span className="toggle-label">Required</span>
-              </label>
-
-              <label className="toggle-switch">
+              {/* Description Toggle */}
+              <label className="toggle-switch description-toggle">
+                <span className="toggle-label">Description</span>
                 <input
                   type="checkbox"
                   checked={localQuestion.description_enabled || false}
                   onChange={(e) => handleFieldChange('description_enabled', e.target.checked)}
                 />
                 <span className="toggle-slider"></span>
-                <span className="toggle-label">Description</span>
+              </label>
+
+              {/* Required Toggle */}
+              <label className="toggle-switch required-toggle">
+                <span className="toggle-label">Required</span>
+                <input
+                  type="checkbox"
+                  checked={localQuestion.required || false}
+                  onChange={(e) => handleFieldChange('required', e.target.checked)}
+                />
+                <span className="toggle-slider"></span>
               </label>
             </div>
           </div>

@@ -19,7 +19,6 @@ const FormLayout = ({
     setShowPreview(!showPreview);
   };
 
-  
   const handlePublishClick = () => {
     setShowPublishModal(true);
   };
@@ -48,7 +47,6 @@ const FormLayout = ({
           </div>
         ) : null}
 
-
         <SectionEditor
           questions={questions}
           onQuestionsChange={onQuestionsChange}
@@ -56,32 +54,35 @@ const FormLayout = ({
           formDescription={formData.description}
         />
 
-
-        <div className="form-config-actions-wrapper">
-          <button
-            className="action-button action-button-secondary"
-            onClick={togglePreview}
-          >
-            <span style={{ marginRight: '8px' }}>👁️</span>
-            Preview Form
-          </button>
-          <div className="actions-right-group">
+        {/* Only show bottom actions when NOT in preview mode */}
+        {!showPreview && (
+          <div className="form-config-actions-wrapper">
             <button
-              className="action-button action-button-outline"
-              onClick={onSaveAsDraft}
-              disabled={saving || questions.length === 0}
+              className="action-button action-button-secondary"
+              onClick={togglePreview}
             >
-              {saving ? 'Saving...' : 'Save as Draft'}
+              <span style={{ marginRight: '8px' }}>👁️</span>
+              Preview Form
             </button>
-            <button
-              className="action-button action-button-primary"
-              onClick={handlePublishClick}
-              disabled={saving || questions.length === 0}
-            >
-              {saving ? 'Publishing...' : `Publish Form `}
-            </button>
+            <div className="actions-right-group">
+              <button
+                className="action-button action-button-outline"
+                onClick={onSaveAsDraft}
+                disabled={saving || questions.length === 0}
+              >
+                {saving ? 'Saving...' : 'Save as Draft'}
+              </button>
+              <button
+                className="action-button action-button-primary"
+                onClick={handlePublishClick}
+                disabled={saving || questions.length === 0}
+              >
+                {saving ? 'Publishing...' : `Publish Form`}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
+
         {/* Publish Confirmation Modal */}
         <Modal
           isOpen={showPublishModal}
@@ -92,7 +93,6 @@ const FormLayout = ({
           type="publish"
           variant="default"
         />
-
       </div>
     </div>
   );

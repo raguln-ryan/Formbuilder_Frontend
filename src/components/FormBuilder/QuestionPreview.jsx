@@ -1,26 +1,62 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import '../../styles/components/FormBuilder/QuestionPreview.css';
 
 const QuestionPreview = ({ formTitle, formDescription, questions }) => {
-  const renderQuestionInput = (question) => {
+  // Initialize form values state
+  const [formValues, setFormValues] = useState({});
+
+  // Prevent background scrolling when preview is open
+  useEffect(() => {
+    // Add class to body to prevent background scroll
+    document.body.classList.add('preview-open');
+    
+    // Cleanup function to remove class when component unmounts
+    return () => {
+      document.body.classList.remove('preview-open');
+    };
+  }, []);
+
+  // Handle input changes
+  const handleInputChange = (questionId, value) => {
+    setFormValues(prev => ({
+      ...prev,
+      [questionId]: value
+    }));
+  };
+
+  // Clear form handler
+  const handleClearForm = () => {
+    if (window.confirm('Are you sure you want to clear all form fields?')) {
+      setFormValues({});
+      // Reset any file inputs
+      const fileInputs = document.querySelectorAll('input[type="file"]');
+      fileInputs.forEach(input => input.value = '');
+    }
+  };
+
+  const renderQuestionInput = (question, index) => {
+    const questionId = question._id || index;
+    const value = formValues[questionId] || '';
+
     switch (question.type) {
       case 'short_text':
         return (
           <input
             type="text"
             className="preview-input"
-            placeholder="Enter your answer"
-            disabled
+            placeholder="Your Answer"
+            value={value}
+            onChange={(e) => handleInputChange(questionId, e.target.value)}
           />
         );
 
       case 'long_text':
         return (
           <textarea
-            className="preview-textarea"
-            placeholder="Enter your detailed answer"
-            rows={4}
-            disabled
+            className="preview-input preview-textarea"
+            placeholder="Your Answer"
+            value={value}
+            onChange={(e) => handleInputChange(questionId, e.target.value)}
           />
         );
 
@@ -29,8 +65,9 @@ const QuestionPreview = ({ formTitle, formDescription, questions }) => {
           <input
             type="number"
             className="preview-input"
-            placeholder="Enter number"
-            disabled
+            placeholder="Your Answer"
+            value={value}
+            onChange={(e) => handleInputChange(questionId, e.target.value)}
           />
         );
 
@@ -39,16 +76,21 @@ const QuestionPreview = ({ formTitle, formDescription, questions }) => {
           <input
             type="date"
             className="preview-input"
-            disabled
+            value={value}
+            onChange={(e) => handleInputChange(questionId, e.target.value)}
           />
         );
 
       case 'choice':
         return (
-          <select className="preview-select" disabled>
-            <option>Select an option</option>
+          <select 
+            className="preview-input"
+            value={value}
+            onChange={(e) => handleInputChange(questionId, e.target.value)}
+          >
+            <option value="">Select Answer</option>
             {(question.options || []).map((option, idx) => (
-              <option key={option.optionId || idx}>
+              <option key={option._id || idx} value={typeof option === 'string' ? option : option.value}>
                 {typeof option === 'string' ? option : option.value}
               </option>
             ))}
@@ -57,66 +99,99 @@ const QuestionPreview = ({ formTitle, formDescription, questions }) => {
 
       case 'file_upload':
         return (
-          <div className="preview-file">
-            <input type="file" disabled />
-            <span className="file-help">Max file size: 10MB</span>
+          <div className="file-upload-preview">
+            <input
+              type="file"
+              id={`file-${questionId}`}
+              style={{ display: 'none' }}
+              onChange={(e) => {
+                const fileName = e.target.files[0]?.name || '';
+                handleInputChange(questionId, fileName);
+              }}
+            />
+            <div 
+              className="file-upload-click-area"
+              onClick={() => document.getElementById(`file-${questionId}`).click()}
+            >
+              {value ? (
+                <div className="file-selected-container">
+                  <p className="file-selected">📎 {value}</p>
+                  <button 
+                    className="remove-file-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleInputChange(questionId, '');
+                      document.getElementById(`file-${questionId}`).value = '';
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p>Drop files here or <span className="browse">Browse</span></p>
+                  <small>Supported files: PDF, PNG, JPG | Max file size: 2 MB | Only one file allowed</small>
+                </>
+              )}
+            </div>
           </div>
         );
 
       default:
-        return <p className="unsupported-type">Unsupported question type: {question.type}</p>;
+        return null;
     }
   };
 
   return (
-    <div className="question-preview">
-      <div className="preview-form">
-        <div className="preview-form-header">
-          <h2 className="preview-title">{formTitle || 'Untitled Form'}</h2>
-          {formDescription && (
-            <p className="preview-description">{formDescription}</p>
-          )}
-        </div>
-        
-        {questions.length === 0 ? (
-          <div className="preview-empty">
-            <div className="empty-icon">📝</div>
-            <p>No questions to preview</p>
-            <p className="empty-hint">Add questions to see them here</p>
+    <>
+      <div className="preview-main-container">
+        <div className="form-card-preview">
+          {/* Form Header */}
+          <div className="form-header-preview">
+            <h3 className="form-title-preview">{formTitle || 'Untitled Form'}</h3>
+            {formDescription && (
+              <p className="form-subtitle-preview">{formDescription}</p>
+            )}
           </div>
-        ) : (
-          <div className="preview-questions">
-            {questions.map((question, index) => (
-              <div key={question.questionId || question.id || index} className="preview-question">
-                <div className="preview-question-header">
-                  <label className="preview-label">
-                    <span className="preview-question-number">{index + 1}.</span>
-                    <span className="preview-question-text">
-                      {question.questionText || question.text || 'Untitled Question'}
-                    </span>
+
+          {/* Questions */}
+          <div className="preview-form">
+            {questions.length === 0 ? (
+              <div className="empty-preview">
+                <p>No questions to preview</p>
+                <small>Add questions to see them here</small>
+              </div>
+            ) : (
+              questions.map((question, index) => (
+                <div key={question._id || index} className="form-group-preview">
+                  <label className="question-label">
+                    {index + 1}. {question.question || 'Untitled Question'}
                     {question.required && <span className="required-mark">*</span>}
                   </label>
+                  {question.description_enabled && question.description && (
+                    <p className="helper-text-preview">{question.description}</p>
+                  )}
+                  <div className="answer-field">
+                    {renderQuestionInput(question, index)}
+                  </div>
                 </div>
-                
-                {question.descriptionEnabled && question.description && (
-                  <p className="preview-description-text">{question.description}</p>
-                )}
-                
-                <div className="preview-answer">
-                  {renderQuestionInput(question)}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
-        )}
-        
-        <div className="preview-footer">
-          <p className="preview-note">
-            * This is a preview. Form cannot be submitted from here.
-          </p>
         </div>
       </div>
-    </div>
+
+      {/* Bottom Action Bar */}
+      <div className="preview-bottom-bar">
+        <button 
+          className="clear-form-button"
+          onClick={handleClearForm}
+          disabled={questions.length === 0}
+        >
+          Clear Form
+        </button>
+      </div>
+    </>
   );
 };
 
