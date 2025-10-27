@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import authService from '../services/authService';
+import toast from 'react-hot-toast';
 import '../styles/pages/LoginPage.css';
 
 const LoginPage = () => {
@@ -45,6 +46,7 @@ const LoginPage = () => {
     // Basic validation
     if (!formData.email || !formData.password) {
       setError('Please enter both email and password');
+      toast.error('Please enter both email and password');
       return;
     }
     
@@ -63,24 +65,37 @@ const LoginPage = () => {
           email: formData.email
         });
         
+        // Success toast
+        toast.success(`Welcome back, ${response.name || formData.email}!`);
+        
         // Redirect based on role
         if (response.role === 'Admin') {
           navigate('/admin');
         } else if (response.role === 'Learner') {
           navigate('/learner/dashboard');
+        } else {
+          // Fallback redirect
+          navigate('/');
         }
       }
     } catch (err) {
       console.error('Login error:', err);
       // Only set error after failed login attempt
       if (err.response?.status === 401) {
-        setError('Invalid email or password');
+        const errorMsg = 'Invalid email or password';
+        setError(errorMsg);
+        toast.error(errorMsg);
       } else if (err.response?.data?.message) {
         setError(err.response.data.message);
+        toast.error(err.response.data.message);
       } else if (err.message) {
-        setError('Unable to connect to server. Please try again.');
+        const errorMsg = 'Unable to connect to server. Please try again.';
+        setError(errorMsg);
+        toast.error(errorMsg);
       } else {
-        setError('Login failed. Please try again.');
+        const errorMsg = 'Login failed. Please try again.';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
     } finally {
       setLoading(false);
@@ -143,8 +158,6 @@ const LoginPage = () => {
             </Link>
           </p>
         </div>
-        
-        
       </div>
     </div>
   );

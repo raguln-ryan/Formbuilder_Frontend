@@ -1,5 +1,6 @@
 import React from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
 import homesIcon from '../../assets/home.png'
 import arrowIcon from "../../assets/AltArrowRight.png"
 import person from "../../assets/person.png"
@@ -7,11 +8,17 @@ import person from "../../assets/person.png"
 function NavigationBar() {
     const location = useLocation();
     const navigate = useNavigate();
+    const { user } = useAuth();
+    
+    // Determine if user is admin or learner
+    const isAdmin = user?.role === 'Admin';
+    const isLearner = user?.role === 'Learner';
     
     // Automatically determine page name based on current route
     const getPageName = () => {
         const path = location.pathname;
         
+        // Admin routes
         if (path.includes('/form/') && path.includes('/view')) {
             return 'View Form';
         } else if (path.includes('/form/') && path.includes('/edit')) {
@@ -24,7 +31,26 @@ function NavigationBar() {
             return 'Form Builder';
         }
         
-        return 'Form Builder';
+        // Learner routes
+        if (path.includes('/learner/dashboard')) {
+            return 'Published Forms';
+        } else if (path.includes('/form/') && path.includes('/fill')) {
+            return 'Form Submission';
+        } else if (path.includes('/learner/submissions')) {
+            return 'My Submissions';
+        }
+        
+        return isAdmin ? 'Form Builder' : 'Dashboard';
+    }
+    
+    const handleHomeClick = () => {
+        if (isAdmin) {
+            navigate('/admin');
+        } else if (isLearner) {
+            navigate('/learner/dashboard');
+        } else {
+            navigate('/');
+        }
     }
     
     const handleLogout = () => {
@@ -40,7 +66,7 @@ function NavigationBar() {
                     src={homesIcon} 
                     alt="Home" 
                     className="home-icon"
-                    onClick={() => navigate('/admin')}
+                    onClick={handleHomeClick}
                     style={{ cursor: 'pointer' }}
                     title="Click to go to home"
                 />
@@ -48,6 +74,9 @@ function NavigationBar() {
                 <span>{getPageName()}</span> 
             </div>
             <div className="header-actions">
+                <div className="user-info" style={{ marginRight: '10px', fontSize: '14px', color: '#666' }}>
+                    {user?.name || user?.email}
+                </div>
                 <img 
                     src={person} 
                     alt="Logout" 
@@ -55,7 +84,7 @@ function NavigationBar() {
                     onClick={handleLogout}
                     style={{ 
                         width: 40, 
-                        height: 40 ,
+                        height: 40,
                         cursor: 'pointer',
                         borderRadius: '70%',
                         objectFit: 'cover'

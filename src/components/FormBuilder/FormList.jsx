@@ -7,6 +7,8 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 import Modal from '../Common/Modal';
 import '../../styles/components/FormBuilder/FormList.css';
 import searchIcon from '../../assets/Ellipse.png';
+import toast from 'react-hot-toast'; 
+
 
 const FormList = () => {
   const [forms, setForms] = useState([]);
@@ -63,7 +65,7 @@ const FormList = () => {
         setFilteredForms([]);
       }
     } catch (err) {
-      console.error('Error loading forms:', err);
+      toast.error('Error loading forms: ' + (err.response?.data?.message || ''));
       setError('Failed to load forms. Please try again.');
     } finally {
       setLoading(false);
@@ -76,7 +78,7 @@ const FormList = () => {
       setDeleteModal({ isOpen: false, formId: null });
       fetchForms();
     } catch (error) {
-      console.error('Error deleting form:', error);
+      toast.error('Error deleting form: ' + (error.response?.data?.message || ''));
     }
   };
 
@@ -123,7 +125,7 @@ const FormList = () => {
       // Refresh the forms list
       fetchForms();
     } catch (error) {
-      console.error('Error toggling form status:', error);
+      toast.error('Error toggling form status: ' + (error.response?.data?.message || ''));
     }
   };
 

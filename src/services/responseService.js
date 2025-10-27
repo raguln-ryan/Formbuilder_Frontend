@@ -23,6 +23,17 @@ const responseService = {
     }
   },
 
+  // Get a specific form by ID for submission
+  getFormById: async (formId) => {
+    try {
+      const response = await api.get(`/response/form/${formId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching form details:', error);
+      throw error;
+    }
+  },
+
   // Submit form response (Learner)
   submitResponse: async (formData) => {
     try {
@@ -31,6 +42,17 @@ const responseService = {
     } catch (error) {
       console.error('Error submitting response:', error);
       throw error;
+    }
+  },
+
+  // Get my submissions (Learner)
+  getMySubmissions: async () => {
+    try {
+      const response = await api.get('/response/my-submissions');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching my submissions:', error);
+      return [];
     }
   },
 

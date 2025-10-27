@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import QuestionEditor from './QuestionEditor';
 import { generateId } from '../../utils/helpers';
 import Drag from './../../assets/drag.png';
+import toast from 'react-hot-toast';
 import '../../styles/components/FormBuilder/FormBuilderCanvas.css';
 
 const FormBuilderCanvas = ({
@@ -51,8 +52,13 @@ const FormBuilderCanvas = ({
       };
 
       onQuestionsChange([...questions, newQuestion]);
+      toast.success(`${fieldType.label} field added successfully!`, {
+        icon: '✅',
+        duration: 2000,
+      });
     } catch (error) {
       console.error('Error adding question:', error);
+      toast.error('Failed to add field. Please try again.');
     }
   };
 
@@ -60,14 +66,21 @@ const FormBuilderCanvas = ({
     const newQuestions = [...questions];
     newQuestions[index] = updatedQuestion;
     onQuestionsChange(newQuestions);
+    
   };
 
   const handleQuestionDelete = (index) => {
+    const deletedQuestion = questions[index];
     const newQuestions = questions.filter((_, i) => i !== index);
     newQuestions.forEach((q, i) => {
       q.order = i;
     });
     onQuestionsChange(newQuestions);
+    
+    toast.success('Question deleted', {
+      icon: '🗑️',
+      duration: 3000,
+    });
   };
 
   const handleQuestionMove = (index, direction) => {
@@ -82,6 +95,16 @@ const FormBuilderCanvas = ({
         q.order = i;
       });
       onQuestionsChange(newQuestions);
+      
+      toast.success(`Question moved ${direction}`, {
+        icon: direction === 'up' ? '⬆️' : '⬇️',
+        duration: 1500,
+        position: 'bottom-center',
+      });
+    } else {
+      toast.error(`Cannot move question ${direction}`, {
+        duration: 2000,
+      });
     }
   };
 
@@ -94,6 +117,11 @@ const FormBuilderCanvas = ({
 
     const newQuestions = [...questions, questionToDuplicate];
     onQuestionsChange(newQuestions);
+    
+    toast.success('Question duplicated successfully!', {
+      icon: '📋',
+      duration: 2000,
+    });
   };
 
   return (

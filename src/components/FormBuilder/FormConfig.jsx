@@ -1,5 +1,5 @@
 import React from 'react';
-
+import toast from 'react-hot-toast';
 
 const FormConfig = ({
   formData,
@@ -12,6 +12,42 @@ const FormConfig = ({
   DESCRIPTION_CHAR_LIMIT
 }) => {
   const isFormValid = formData.title.trim() && formData.description.trim();
+
+  const handleSaveAsDraft = async () => {
+    try {
+      await onSaveAsDraft();
+      toast.success('Form saved as draft successfully!');
+    } catch (error) {
+      toast.error('Failed to save form as draft');
+    }
+  };
+
+  const handleNext = () => {
+    if (!isFormValid) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+    toast.success('Moving to next step...');
+    onNext();
+  };
+
+  const handleInputChange = (field, value) => {
+    onInputChange(field, value);
+    
+    // Show validation feedback for required fields
+    if (field === 'title' && value.trim() === '') {
+      toast.error('Form name is required', { id: 'title-validation' });
+    } else if (field === 'title' && value.trim()) {
+      toast.dismiss('title-validation');
+    }
+  };
+
+  const handleVisibilityToggle = (checked) => {
+    onInputChange('isVisible', checked);
+    toast.success(checked ? 'Form is now visible' : 'Form is now hidden', {
+      icon: checked ? '👁️' : '🙈',
+    });
+  };
 
   return (
     <div className="form-editor-content-area">
@@ -29,7 +65,7 @@ const FormConfig = ({
                 type="text"
                 className={`form-name-input ${errors.title ? 'error' : ''}`}
                 value={formData.title}
-                onChange={(e) => onInputChange('title', e.target.value)}
+                onChange={(e) => handleInputChange('title', e.target.value)}
                 placeholder="Enter Form Name"
                 maxLength={TITLE_CHAR_LIMIT}
               />
@@ -44,7 +80,7 @@ const FormConfig = ({
               <textarea
                 className={`form-description-input ${errors.description ? 'error' : ''}`}
                 value={formData.description}
-                onChange={(e) => onInputChange('description', e.target.value)}
+                onChange={(e) => handleInputChange('description', e.target.value)}
                 placeholder="Summarize the form's purpose for internal reference."
                 rows={4}
                 maxLength={DESCRIPTION_CHAR_LIMIT}
@@ -62,7 +98,7 @@ const FormConfig = ({
                   <input
                     type="checkbox"
                     checked={formData.isVisible || false}
-                    onChange={(e) => onInputChange('isVisible', e.target.checked)}
+                    onChange={(e) => handleVisibilityToggle(e.target.checked)}
                   />
                   <span className="visibility-slider"></span>
                 </label>
@@ -79,14 +115,14 @@ const FormConfig = ({
           <div className="form-config-actions-wrapper">
             <button
               className="action-button action-button-outline"
-              onClick={onSaveAsDraft}
+              onClick={handleSaveAsDraft}
               disabled={saving || !isFormValid}
             >
               {saving ? 'Saving...' : 'Save as Draft'}
             </button>
             <button
               className="action-button action-button-primary"
-              onClick={onNext}
+              onClick={handleNext}
               disabled={saving || !isFormValid}
             >
               Next

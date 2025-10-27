@@ -6,7 +6,7 @@ import FormLayout from './FormLayout';
 import formService from '../../services/formService';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import '../../styles/components/FormBuilder/FormEditor.css';
-
+import toast from 'react-hot-toast';
 
 const FormEditor = ({ formId }) => {
   const navigate = useNavigate();
@@ -155,9 +155,9 @@ const FormEditor = ({ formId }) => {
         await formService.updateForm(savedFormId, { questions });
       }
 
-      alert('Form saved as draft successfully!');
+      toast.success('Form saved as draft successfully!');
     } catch (error) {
-      alert('Failed to save form. Please try again.');
+      toast.error('Failed to save form. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -180,7 +180,7 @@ const FormEditor = ({ formId }) => {
 
       setActiveTab('layout');
     } catch (error) {
-      alert('Failed to save form configuration.');
+      toast.error('Failed to save form configuration.');
     } finally {
       setSaving(false);
     }
@@ -188,12 +188,12 @@ const FormEditor = ({ formId }) => {
 
   const handleSaveLayoutAsDraft = async () => {
     if (!currentFormId) {
-      alert('Please save form configuration first');
+      toast.error('Please save form configuration first');
       return;
     }
 
     if (questions.length === 0) {
-      alert('Please add at least one question');
+      toast.error('Please add at least one question');
       return;
     }
 
@@ -239,9 +239,9 @@ const FormEditor = ({ formId }) => {
       }));
 
       await formService.updateForm(currentFormId, { questions: questionsForBackend });
-      alert('Form saved as draft successfully!');
+      toast.success('Form saved as draft successfully!');
     } catch (error) {
-      alert('Failed to save form as draft.');
+      toast.error('Failed to save form as draft.');
     } finally {
       setSaving(false);
     }
@@ -249,12 +249,12 @@ const FormEditor = ({ formId }) => {
 
   const handlePublish = async () => {
     if (!currentFormId) {
-      alert('Please save form first');
+      toast.error('Please save form first');
       return;
     }
 
     if (!questions || questions.length === 0) {
-      alert('Cannot publish form without questions. Please add at least one question.');
+      toast.error('Cannot publish form without questions. Please add at least one question.');
       return;
     }
 
@@ -288,7 +288,7 @@ const FormEditor = ({ formId }) => {
 
       navigate('/admin');
     } catch (error) {
-      alert('Failed to publish form. ' + (error.response?.data?.message || ''));
+      toast.error('Failed to publish form. ' + (error.response?.data?.message || ''));
     } finally {
       setSaving(false);
     }
