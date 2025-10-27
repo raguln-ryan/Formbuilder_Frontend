@@ -49,6 +49,7 @@ const responseService = {
   getMySubmissions: async () => {
     try {
       const response = await api.get('/response/my-submissions');
+      console.log('My submissions from API:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching my submissions:', error);

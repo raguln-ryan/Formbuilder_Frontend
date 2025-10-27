@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import NavigationBar from '../components/Common/NavigationBar';
 import FormConfig from '../components/FormBuilder/FormConfig';
 import SectionEditor from '../components/FormBuilder/SectionEditor';
@@ -18,7 +19,12 @@ import round from '../assets/round.png';
 const ViewFormPage = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('configuration');
+
+  const location = useLocation();
+  
+  // Set initial tab based on navigation state
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'configuration');
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -49,6 +55,13 @@ const ViewFormPage = () => {
       fetchFormDetails();
     }
   }, [formId]);
+
+  // Fetch responses when responses tab is activated
+  useEffect(() => {
+    if (activeTab === 'responses' && responses.length === 0) {
+      fetchResponses();
+    }
+  }, [activeTab]);
 
   const fetchFormDetails = async () => {
     try {
@@ -88,6 +101,11 @@ const ViewFormPage = () => {
           setQuestions(formattedQuestions);
         } else {
           setQuestions([]);
+        }
+        
+        // If navigated to responses tab, fetch responses
+        if (location.state?.activeTab === 'responses') {
+          fetchResponses();
         }
       }
     } catch (err) {
@@ -272,6 +290,11 @@ const ViewFormPage = () => {
     }
   };
 
+  const formatSubmissionDate = (date) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleString();
+  };
+
   if (loading) {
     return (
       <div className="view-form-page">
@@ -430,7 +453,8 @@ const ViewFormPage = () => {
                               <td>{response.submittedBy}</td>
                               <td>{response.userId}</td>
                               <td>{response.formTitle}</td>
-                              <td>{new Date(response.submittedAt).toLocaleString()}</td>
+
+                              <td>{formatSubmissionDate(response.submittedAt)}</td>
                               <td>{response.email}</td>
                               <td>
                                 <button 
@@ -508,7 +532,8 @@ const ViewFormPage = () => {
                         <h2 className="response-form-title">{formData.title}</h2>
                         <p className="response-meta">
                           Submitted by: {selectedResponse.submittedBy} | 
-                          Date: {new Date(selectedResponse.submittedAt).toLocaleString()}
+
+                          Date: {formatSubmissionDate(selectedResponse.submittedAt)}
                         </p>
                       </div>
                       <div className="response-detail-content">

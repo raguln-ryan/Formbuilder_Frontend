@@ -103,14 +103,16 @@ const FormList = () => {
     setActiveMenu(null);
   };
 
+  // Updated to navigate to form view page with responses tab active
   const handleViewResponses = (formId) => {
-    navigate(`/form/${formId}/responses`);
+    // Navigate to form view page with state to activate responses tab
+    navigate(`/form/${formId}/view`, { state: { activeTab: 'responses' } });
     setActiveMenu(null);
   };
 
   const handleViewForm = (formId) => {
-    // Navigate to view form page
-    navigate(`/form/${formId}/view`);
+    // Navigate to form view page with questions tab active (default)
+    navigate(`/form/${formId}/view`, { state: { activeTab: 'questions' } });
     setActiveMenu(null);
   };
 
@@ -276,7 +278,7 @@ const FormList = () => {
                         <span className="form-detail-label">Published date:</span>
                         <span>
                           {form.publishedDate
-                            ? new Date(form.createdDate).toLocaleDateString()
+                            ? new Date(form.publishedDate).toLocaleDateString()
                             : new Date().toLocaleDateString()}
                         </span>
                       </div>
@@ -304,10 +306,16 @@ const FormList = () => {
                     </div>
                   )}
 
+                  {/* View Responses button - navigates to form view page with responses tab */}
                   <button
                     className={`view-responses-btn ${form.status === 0 ? 'disabled' : ''}`}
-                    onClick={() => form.status === 1 && handleViewResponses(form.formId || form._id)}
+                    onClick={() => {
+                      if (form.status === 1) {
+                        handleViewResponses(form.formId || form._id);
+                      }
+                    }}
                     disabled={form.status === 0}
+                    title={form.status === 0 ? 'Publish form to view responses' : 'View form responses'}
                   >
                     View Responses
                   </button>

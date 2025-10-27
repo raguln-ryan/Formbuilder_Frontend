@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import authService from '../services/authService';
 import '../styles/pages/RegisterPage.css';
-
+import toast from 'react-hot-toast';
 const RegisterPage = () => {
   const navigate = useNavigate();
   const { login, isAuthenticated } = useAuth();
@@ -95,7 +95,8 @@ const RegisterPage = () => {
       const response = await authService.register({
         name: formData.name,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        role: 'Learner'
       });
 
       if (response && response.token) {
@@ -115,12 +116,12 @@ const RegisterPage = () => {
         }, 1500);
       }
     } catch (error) {
-      console.error('Registration error:', error);
+      toast.error('Registration error:', error);
       
       // Handle specific error messages from backend
       if (error.response?.data?.message) {
         if (error.response.data.message.includes('already exists')) {
-          setErrors({ email: 'This email is already registered' });
+          setErors({ email: 'This email is already registered' });
         } else {
           setErrors({ general: error.response.data.message });
         }
