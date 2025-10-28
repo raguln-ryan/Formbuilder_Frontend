@@ -540,9 +540,7 @@ const FormSubmission = () => {
             </div>
 
             <div className="form-footer">
-              <p>
-                ⚠️ This form cannot be saved temporarily, please submit once completed.
-              </p>
+             
             </div>
           </form>
         </div>

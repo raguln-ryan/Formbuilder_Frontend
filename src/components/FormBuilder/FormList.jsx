@@ -386,13 +386,13 @@ const FormList = () => {
         title={`Delete ${deleteModal.formTitle || 'Form'}`}
         message={
           deleteModal.hasResponses 
-            ? `⚠️ WARNING: This form has ${deleteModal.responseCount} submission(s). Deleting this form will permanently delete all associated responses and data. This action cannot be undone.`
+            ? `This form has ${deleteModal.responseCount} submission(s). Deleting this form will permanently delete all associated responses and data. This action cannot be undone.`
             : deleteModal.formStatus === 1
             ? "Are you sure you want to delete this published form? This action cannot be undone."
             : "Are you sure you want to delete this draft form? This action cannot be undone."
         }
         variant="danger"
-        confirmText={deleteModal.hasResponses ? "Delete Form & All Responses" : "Yes, Delete"}
+        confirmText={"Yes, Delete"}
       />
 
 
