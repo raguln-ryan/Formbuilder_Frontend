@@ -19,6 +19,16 @@ const FormList = () => {
   const [error, setError] = useState(null);
   const [activeMenu, setActiveMenu] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  
+  // State to track enabled/disabled status for each form
+  const [formEnabledStatus, setFormEnabledStatus] = useState({});
+  
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -30,7 +40,14 @@ const FormList = () => {
 
   useEffect(() => {
     fetchForms();
-  }, []);
+  }, [currentPage, itemsPerPage]);
+
+  useEffect(() => {
+    // Reset to first page when search term changes
+    if (searchTerm) {
+      setCurrentPage(1);
+    }
+  }, [searchTerm]);
 
   useEffect(() => {
     const filtered = forms.filter((form) =>
@@ -53,17 +70,60 @@ const FormList = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await formService.getAllForms();
+      
+      // Calculate offset based on current page
+      const offset = (currentPage - 1) * itemsPerPage;
+      
+      const response = await formService.getAllForms(offset, itemsPerPage);
 
       if (response?.data) {
-        setForms(response.data);
-        setFilteredForms(response.data);
+        // Handle paginated response
+        if (response.data.items && Array.isArray(response.data.items)) {
+          setForms(response.data.items);
+          setFilteredForms(response.data.items);
+          setTotalItems(response.data.totalCount || response.data.items.length);
+          setTotalPages(Math.ceil((response.data.totalCount || response.data.items.length) / itemsPerPage));
+          
+          // Initialize enabled status for each form
+          const initialStatus = {};
+          response.data.items.forEach(form => {
+            initialStatus[form.formId || form._id] = form.isEnabled || false;
+          });
+          setFormEnabledStatus(initialStatus);
+        } else if (Array.isArray(response.data)) {
+          setForms(response.data);
+          setFilteredForms(response.data);
+          setTotalItems(response.totalCount || response.data.length);
+          setTotalPages(Math.ceil((response.totalCount || response.data.length) / itemsPerPage));
+          
+          // Initialize enabled status for each form
+          const initialStatus = {};
+          response.data.forEach(form => {
+            initialStatus[form.formId || form._id] = form.isEnabled || false;
+          });
+          setFormEnabledStatus(initialStatus);
+        } else {
+          setForms(response.data);
+          setFilteredForms(response.data);
+        }
       } else if (Array.isArray(response)) {
         setForms(response);
         setFilteredForms(response);
+        setTotalItems(response.length);
+        setTotalPages(Math.ceil(response.length / itemsPerPage));
+        
+        // Initialize enabled status for each form
+        const initialStatus = {};
+        response.forEach(form => {
+          initialStatus[form.formId || form._id] = form.isEnabled || false;
+        });
+        setFormEnabledStatus(initialStatus);
       } else {
         setForms([]);
         setFilteredForms([]);
+        setTotalItems(0);
+        setTotalPages(0);
+        setFormEnabledStatus({});
       }
     } catch (err) {
       toast.error('Error loading forms: ' + (err.response?.data?.message || ''));
@@ -73,17 +133,62 @@ const FormList = () => {
     }
   };
 
+  const handlePageChange = (page) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleItemsPerPageChange = (e) => {
+    const newItemsPerPage = parseInt(e.target.value);
+    setItemsPerPage(newItemsPerPage);
+    setCurrentPage(1);
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxPagesToShow = 5;
+    
+    if (totalPages <= maxPagesToShow) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) {
+          pages.push(i);
+        }
+      } else {
+        pages.push(1);
+        pages.push('...');
+        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+          pages.push(i);
+        }
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
+  };
+
   const handleDeleteClick = async (formId) => {
-    // Find the form to check its status and get details
     const form = forms.find(f => (f.formId || f._id) === formId);
     
-    // Check if form has responses (for published forms)
     let hasResponses = false;
     let responseCount = 0;
     
-    if (form?.status === 1) { // Published form
+    if (form?.status === 1) {
       try {
-        // Check if there are responses for this form
         const responses = await formService.getFormResponses(formId);
         hasResponses = responses && responses.length > 0;
         responseCount = responses?.length || 0;
@@ -119,18 +224,23 @@ const FormList = () => {
       
       toast.dismiss(loadingToast);
       
-      // Now result will have { success: true, message: "..." }
       if (result.success) {
         toast.success(result.message || `Form deleted successfully`);
-        // Refresh the forms list
-        setTimeout(() => {
-          fetchForms();
-        }, 500);
+        
+        const remainingItems = totalItems - 1;
+        const newTotalPages = Math.ceil(remainingItems / itemsPerPage);
+        
+        if (currentPage > newTotalPages && newTotalPages > 0) {
+          setCurrentPage(newTotalPages);
+        } else {
+          setTimeout(() => {
+            fetchForms();
+          }, 500);
+        }
       }
       
     } catch (error) {
       console.error('Error in handleDelete:', error);
-      
       const errorMessage = error.message || 'Failed to delete form';
       toast.error(errorMessage);
     } finally {
@@ -138,7 +248,6 @@ const FormList = () => {
     }
   };
 
-  // Update handlePublish function
   const handlePublish = async (formId) => {
     setPublishModal({ isOpen: true, formId });
     setActiveMenu(null);
@@ -154,32 +263,38 @@ const FormList = () => {
     setActiveMenu(null);
   };
 
-  // Updated to navigate to form view page with responses tab active
   const handleViewResponses = (formId) => {
-    // Navigate to form view page with state to activate responses tab
     navigate(`/form/${formId}/view`, { state: { activeTab: 'responses' } });
     setActiveMenu(null);
   };
 
   const handleViewForm = (formId) => {
-    // Navigate to form view page with questions tab active (default)
     navigate(`/form/${formId}/view`, { state: { activeTab: 'questions' } });
     setActiveMenu(null);
   };
 
-  const handleToggleEnable = async (formId) => {
-    try {
-      const form = forms.find(f => (f.formId || f._id) === formId);
-      const newEnabledStatus = !form.isEnabled;
-
-      // Update the form's enabled status
-      await formService.updateFormStatus(formId, { isEnabled: newEnabledStatus });
-
-      // Refresh the forms list
-      fetchForms();
-    } catch (error) {
-      toast.error('Error toggling form status: ' + (error.response?.data?.message || ''));
-    }
+  // Updated handleToggleEnable function - simpler version
+  const handleToggleEnable = (formId) => {
+    // Update both forms and filteredForms
+    const updateFormEnabled = (formsList) => 
+      formsList.map(form => 
+        (form.formId || form._id) === formId 
+          ? { ...form, isEnabled: !form.isEnabled } 
+          : form
+      );
+    
+    setForms(updateFormEnabled);
+    setFilteredForms(updateFormEnabled);
+    
+    // Get the new status for the toast
+    const currentForm = forms.find(f => (f.formId || f._id) === formId);
+    const newStatus = !currentForm?.isEnabled;
+    
+    // Show visual feedback
+    toast.success(`Form ${newStatus ? 'enabled' : 'disabled'}`, {
+      duration: 2000,
+      icon: newStatus ? '✅' : '⏸️',
+    });
   };
 
   if (loading) return <LoadingSpinner />;
@@ -240,143 +355,198 @@ const FormList = () => {
           )}
         </div>
       ) : (
-        <div className="form-grid">
-          {filteredForms.map((form) => (
-            <div key={form.formId || form._id} className="form-card">
-              <div className="menu-container">
-                <button
-                  className="menu-dots"
-                  onClick={(e) => toggleMenu(form.formId || form._id, e)}
-                  aria-label="More options"
-                >
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </button>
-                {activeMenu === (form.formId || form._id) && (
-                  <div className="dropdown-menu">
+        <>
+          <div className="form-grid">
+            {filteredForms.map((form) => (
+              <div key={form.formId || form._id} className="form-card">
+                <div className="menu-container">
+                  <button
+                    className="menu-dots"
+                    onClick={(e) => toggleMenu(form.formId || form._id, e)}
+                    aria-label="More options"
+                  >
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </button>
+                  {activeMenu === (form.formId || form._id) && (
+                    <div className="dropdown-menu">
+                      {form.status === 0 ? (
+                        <>
+                          <button
+                            onClick={() => handleEdit(form.formId || form._id)}
+                            className="dropdown-item"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handlePublish(form.formId || form._id)}
+                            className="dropdown-item"
+                          >
+                            Publish
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(form.formId || form._id)}
+                            className="dropdown-item delete"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => handleViewForm(form.formId || form._id)}
+                            className="dropdown-item"
+                          >
+                            View Form
+                          </button>
+                          <button
+                            onClick={() => handleDeleteClick(form.formId || form._id)}
+                            className="dropdown-item delete"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-card-content">
+
+                  <h3 className="form-name">{form.title || 'Untitled Form'}</h3>
+
+                  <div className="form-details">
                     {form.status === 0 ? (
-                      // Draft status - show Edit, Publish, Delete
                       <>
-                        <button
-                          onClick={() => handleEdit(form.formId || form._id)}
-                          className="dropdown-item"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handlePublish(form.formId || form._id)}
-                          className="dropdown-item"
-                        >
-                          Publish
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(form.formId || form._id)}
-                          className="dropdown-item delete"
-                        >
-                          Delete
-                        </button>
+                        <div className="form-detail-item">
+                          <span className="form-detail-label">Created by:</span>
+                          <span>{form.createdBy || 'Admin'}</span>
+                        </div>
+                        <div className="form-detail-item">
+                          <span className="form-detail-label">Created date:</span>
+                          <span>
+                            {form.createdDate
+                              ? new Date(form.createdDate).toLocaleDateString()
+                              : new Date().toLocaleDateString()}
+                          </span>
+                        </div>
                       </>
                     ) : (
-                      // Published status - show View Form, Delete
                       <>
-                        <button
-                          onClick={() => handleViewForm(form.formId || form._id)}
-                          className="dropdown-item"
-                        >
-                          View Form
-                        </button>
-                        <button
-                          onClick={() => handleDeleteClick(form.formId || form._id)}
-                          className="dropdown-item delete"
-                        >
-                          Delete
-                        </button>
+                        <div className="form-detail-item">
+                          <span className="form-detail-label">Published by:</span>
+                          <span>{form.publishedBy || 'Admin'}</span>
+                        </div>
+                        <div className="form-detail-item">
+                          <span className="form-detail-label">Published date:</span>
+                          <span>
+                            {form.publishedDate
+                              ? new Date(form.publishedDate).toLocaleDateString()
+                              : new Date().toLocaleDateString()}
+                          </span>
+                        </div>
                       </>
                     )}
                   </div>
-                )}
+
+                  <div className="form-card-footer">
+                    <button className={`status-badge status-${form.status === 0 ? 'draft' : 'published'}`}>
+                      {form.status === 0 ? 'Draft' : 'Published'}
+                    </button>
+
+                    {form.status === 1 && (
+                      <div className="toggle-container">
+                        <span className="toggle-label">Enabled</span>
+                        <label className="toggle-switch">
+                          <input
+                            type="checkbox"
+                            checked={form.isEnabled || false}
+                            onChange={() => handleToggleEnable(form.formId || form._id)}
+                          />
+                          <span className="toggle-slider"></span>
+                        </label>
+                      </div>
+                    )}
+
+                    <button
+                      className={`view-responses-btn ${form.status === 0 ? 'disabled' : ''}`}
+                      onClick={() => {
+                        if (form.status === 1) {
+                          handleViewResponses(form.formId || form._id);
+                        }
+                      }}
+                      disabled={form.status === 0}
+                      title={form.status === 0 ? 'Publish form to view responses' : 'View form responses'}
+                    >
+                      View Responses
+                    </button>
+                  </div>
+
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="pagination-container">
+              <div className="pagination-info">
+                <span>
+                  Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} forms
+                </span>
+                <div className="items-per-page">
+                  <label htmlFor="itemsPerPage">Items per page:</label>
+                  <select 
+                    id="itemsPerPage"
+                    value={itemsPerPage} 
+                    onChange={handleItemsPerPageChange}
+                    className="items-per-page-select"
+                  >
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="form-card-content">
+              <div className="pagination-controls">
+                <button 
+                  className="pagination-btn"
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  aria-label="Previous page"
+                >
+                  ←
+                </button>
 
-                <h3 className="form-name">{form.title || 'Untitled Form'}</h3>
-
-                <div className="form-details">
-                  {form.status === 0 ? (
-                    <>
-                      <div className="form-detail-item">
-                        <span className="form-detail-label">Created by:</span>
-                        <span>{form.createdBy || 'Admin'}</span>
-                      </div>
-                      <div className="form-detail-item">
-                        <span className="form-detail-label">Created date:</span>
-                        <span>
-                          {form.createdDate
-                            ? new Date(form.createdDate).toLocaleDateString()
-                            : new Date().toLocaleDateString()}
-                        </span>
-                      </div>
-
-                    </>
+                {getPageNumbers().map((page, index) => (
+                  page === '...' ? (
+                    <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
                   ) : (
-                    <>
-                      <div className="form-detail-item">
-                        <span className="form-detail-label">Published by:</span>
-                        <span>{form.publishedBy || 'Admin'}</span>
-                      </div>
-                      <div className="form-detail-item">
-                        <span className="form-detail-label">Published date:</span>
-                        <span>
-                          {form.publishedDate
-                            ? new Date(form.publishedDate).toLocaleDateString()
-                            : new Date().toLocaleDateString()}
-                        </span>
-                      </div>
+                    <button
+                      key={page}
+                      className={`pagination-btn ${currentPage === page ? 'active' : ''}`}
+                      onClick={() => handlePageChange(page)}
+                    >
+                      {page}
+                    </button>
+                  )
+                ))}
 
-                    </>
-                  )}
-                </div>
-
-                <div className="form-card-footer">
-                  <button className={`status-badge status-${form.status === 0 ? 'draft' : 'published'}`}>
-                    {form.status === 0 ? 'Draft' : 'Published'}
-                  </button>
-
-                  {form.status === 1 && (
-                    <div className="toggle-container">
-                      <span className="toggle-label">Enabled</span>
-                      <label className="toggle-switch">
-                        <input
-                          type="checkbox"
-                          checked={form.isEnabled || false}
-                          onChange={() => handleToggleEnable(form.formId || form._id)}
-                        />
-                        <span className="toggle-slider"></span>
-                      </label>
-                    </div>
-                  )}
-
-                  {/* View Responses button - navigates to form view page with responses tab */}
-                  <button
-                    className={`view-responses-btn ${form.status === 0 ? 'disabled' : ''}`}
-                    onClick={() => {
-                      if (form.status === 1) {
-                        handleViewResponses(form.formId || form._id);
-                      }
-                    }}
-                    disabled={form.status === 0}
-                    title={form.status === 0 ? 'Publish form to view responses' : 'View form responses'}
-                  >
-                    View Responses
-                  </button>
-                </div>
-
-
+                <button 
+                  className="pagination-btn"
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  aria-label="Next page"
+                >
+                  →
+                </button>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       <Modal
@@ -394,7 +564,6 @@ const FormList = () => {
         variant="danger"
         confirmText={"Yes, Delete"}
       />
-
 
     </div>
   );

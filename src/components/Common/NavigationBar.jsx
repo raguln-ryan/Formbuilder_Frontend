@@ -74,7 +74,7 @@ function NavigationBar() {
                 <span>{getPageName()}</span> 
             </div>
             <div className="header-actions">
-                <div className="user-info" style={{ marginRight: '10px', fontSize: '14px', color: '#666' }}>
+                <div className="user-info" style={{ marginRight: '10px', fontSize: '16px', color: 'black' }}>
                     {user?.name || user?.email}
                 </div>
                 <img 

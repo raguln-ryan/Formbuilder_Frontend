@@ -128,7 +128,8 @@ const ViewFormPage = () => {
         formTitle: formData.title,
         submittedAt: response.submittedAt,
         email: response.user?.email || '-',
-        details: response.details || []
+        details: response.details || [],
+        answers: response.answers || response.details || []
       }));
       
       setResponses(formattedResponses);
@@ -136,6 +137,81 @@ const ViewFormPage = () => {
       console.error('Error fetching responses:', err);
       setResponses([]);
     }
+  };
+
+  // Helper function to get answer value (from SubmissionView)
+  const getAnswerValue = (question, questionIndex, responseData) => {
+    if (!responseData) return '';
+    
+    // Check for answers array
+    if (responseData.answers && Array.isArray(responseData.answers)) {
+      // Try to find by questionId
+      const answer = responseData.answers.find(a => {
+        return String(a.questionId) === String(question._id) || 
+               String(a.questionId) === String(question.id);
+      });
+      
+      if (answer) {
+        return answer.answer || answer.value || answer.response || answer.text || '';
+      }
+      
+      // Try by index
+      if (responseData.answers[questionIndex]) {
+        const answerByIndex = responseData.answers[questionIndex];
+        return answerByIndex.answer || answerByIndex.value || answerByIndex.response || answerByIndex;
+      }
+    }
+    
+    // Check details array (fallback)
+    if (responseData.details && Array.isArray(responseData.details)) {
+      const detail = responseData.details.find(d => 
+        String(d.questionId) === String(question._id) || 
+        String(d.questionId) === String(question.id)
+      );
+      
+      if (detail) {
+        return detail.answer || detail.value || '';
+      }
+    }
+    
+    return '';
+  };
+
+  // Format date helper
+  const formatDate = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-US', {
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric'
+    });
+  };
+
+  // Render answer based on question type (from SubmissionView)
+  const renderAnswer = (question, questionIndex, responseData) => {
+    const answerValue = getAnswerValue(question, questionIndex, responseData);
+    
+    // For file upload questions
+    if (question.type === 'file_upload' || question.type === 'file') {
+      if (answerValue && answerValue.includes('.')) {
+        return (
+          <button className="upload-link">
+            View Uploaded File: {answerValue}
+          </button>
+        );
+      }
+      return <span className="no-answer">No file uploaded</span>;
+    }
+    
+    // For date questions
+    if (question.type === 'date' || question.type === 'date_picker') {
+      if (answerValue && answerValue !== '-') {
+        return formatDate(answerValue);
+      }
+    }
+    
+    return answerValue || '-';
   };
 
   // Filter and sort responses
@@ -519,35 +595,72 @@ const ViewFormPage = () => {
                     </>
                   )
                 ) : (
-                  // Individual Response View
+                  // Individual Response View - Using SubmissionView structure
                   selectedResponse ? (
-                    <div className="individual-response-detail">
-                      <div className="response-detail-header">
+                    <div className="submission-view-wrapper">
+                      <div className="submission-view-card">
                         <button
                           className="back-button"
-                          onClick={() => setSelectedResponse(null)}
+                          onClick={() => {
+                            setSelectedResponse(null);
+                            setResponseView('summary');
+                          }}
+                          style={{ marginBottom: '1rem' }}
                         >
-                          ← Back to list
+                          ← Back to summary
                         </button>
-                        <h2 className="response-form-title">{formData.title}</h2>
-                        <p className="response-meta">
-                          Submitted by: {selectedResponse.submittedBy} | 
-
-                          Date: {formatSubmissionDate(selectedResponse.submittedAt)}
+                        
+                        <h2 className="submission-view-title">
+                          {formData.title || 'Form Submission'}
+                        </h2>
+                        <p className="submission-view-subtitle">
+                          Submitted by {selectedResponse.submittedBy} on {formatDate(selectedResponse.submittedAt)}
                         </p>
-                      </div>
-                      <div className="response-detail-content">
-                        {questions.map((question, index) => {
-                          const answer = selectedResponse.details?.find(d => d.questionId === question._id);
-                          return (
-                            <div key={question._id} className="response-field">
-                              <label>{index + 1}. {question.question}</label>
-                              <div className="response-answer">
-                                {answer?.answer || 'No answer provided'}
+
+                        {questions && questions.length > 0 ? (
+                          questions.map((question, index) => {
+                            const answerValue = getAnswerValue(question, index, selectedResponse);
+                            
+                            return (
+                              <div key={question._id || index} className="submission-form-group">
+                                <label className="submission-form-label">
+                                  <span className="submission-q-number">{index + 1}</span>
+                                  {question.question || question.text}
+                                  {question.required && <span className="submission-asterisk">*</span>}
+                                </label>
+                                
+                                {question.description && (
+                                  <p className="submission-form-hint">{question.description}</p>
+                                )}
+                                
+                                {question.type === 'long_text' || question.type === 'long_answer' || question.type === 'paragraph' ? (
+                                  <textarea 
+                                    className="submission-form-textarea" 
+                                    value={answerValue}
+                                    readOnly
+                                    placeholder="-"
+                                  />
+                                ) : question.type === 'file_upload' || question.type === 'file' ? (
+                                  <div className="submission-form-input">
+                                    {renderAnswer(question, index, selectedResponse)}
+                                  </div>
+                                ) : (
+                                  <input 
+                                    type="text" 
+                                    className="submission-form-input" 
+                                    value={answerValue}
+                                    readOnly
+                                    placeholder="-"
+                                  />
+                                )}
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })
+                        ) : (
+                          <div className="form-group">
+                            <p>No questions available for this form.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ) : (
