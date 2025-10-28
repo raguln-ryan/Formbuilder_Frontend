@@ -262,6 +262,51 @@
   margin-top: 8px;
 }
 
+.question-type-display {
+  width: 1128px;
+  height: 42px;
+  opacity: 1;
+  border-radius: 8px;
+  border: 1px solid #D8D8D8;
+  background-color: #F3F2F3;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.type-label {
+  display: none; /* Hiding based on your design specs */
+}
+
+.type-info-box {
+  width: 200px;
+  height: 20px;
+  position: absolute;
+  top: 10px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.type-name {
+  font-family: 'Lato', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: 0px;
+  width: 250px;
+  height : 24px;
+  color: #585561;
+  vertical-align: middle;
+}
+
+.type-description {
+  display: none; /* Based on the single line height specification */
+  width: 250px;
+  height : 24px;
+}
+
+
 .options-header {
   display: flex;
   justify-content: space-between;

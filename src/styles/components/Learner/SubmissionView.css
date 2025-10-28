@@ -1,0 +1,140 @@
+/*
+
+.form-wrapper {
+  background-color: #f8f9fb;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 100vh;
+  padding: 40px;
+}
+
+
+.form-card {
+  width: 916px;
+  background: #ffffff;
+  border: 1px solid #d8d8d8;
+  border-radius: 12px;
+  border-top: solid 10px #5d38df;
+  box-shadow: 0px 0px 8px rgba(0, 0, 0, 0.08);
+  padding: 30px 35px;
+  font-family: "Inter", sans-serif;
+}
+
+
+.form-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e1e1e;
+  margin-bottom: 6px;
+}
+
+.form-subtitle {
+  font-size: 13px;
+  color: #6b6b6b;
+  margin-bottom: 24px;
+}
+
+
+.form-group {
+  margin-bottom: 24px;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1d1d1f;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.q-number {
+  background-color: #eef3ff;
+  color: #5d38df;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.asterisk {
+  color: #d22;
+  margin-left: 2px;
+}
+
+.form-hint {
+  font-size: 12px;
+  color: #6b6b6b;
+  margin: 3px 0 6px 26px;
+}
+
+.form-input,
+.form-textarea {
+  width: 100%;
+  border: 1px solid #d8d8d8;
+  border-radius: 6px;
+  background-color: #f5f5f5;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #1d1d1f;
+  outline: none;
+}
+
+.form-input[readonly],
+.form-textarea[readonly] {
+  cursor: default;
+}
+
+.form-input::placeholder,
+.form-textarea::placeholder {
+  color: #8b8b8b;
+}
+
+.form-input:focus,
+.form-textarea:focus {
+  border-color: #5d38df;
+  background-color: #ffffff;
+}
+
+
+.form-textarea {
+  height: 80px;
+  resize: none;
+  font-family: "Inter", sans-serif;
+}
+
+
+.upload-link {
+  margin-left: 26px;
+  background: none;
+  border: none;
+  color: #5d38df;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 500;
+}
+
+.upload-link:hover {
+  text-decoration: none;
+  color: #4723c6;
+}
+
+
+.no-answer {
+  color: #8b8b8b;
+  font-style: italic;
+  margin-left: 26px;
+  font-size: 13px;
+}
+
+
+
+*/

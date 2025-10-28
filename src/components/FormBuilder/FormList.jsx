@@ -18,6 +18,7 @@ const FormList = () => {
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, formId: null });
   const [error, setError] = useState(null);
   const [activeMenu, setActiveMenu] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -72,13 +73,68 @@ const FormList = () => {
     }
   };
 
+  const handleDeleteClick = async (formId) => {
+    // Find the form to check its status and get details
+    const form = forms.find(f => (f.formId || f._id) === formId);
+    
+    // Check if form has responses (for published forms)
+    let hasResponses = false;
+    let responseCount = 0;
+    
+    if (form?.status === 1) { // Published form
+      try {
+        // Check if there are responses for this form
+        const responses = await formService.getFormResponses(formId);
+        hasResponses = responses && responses.length > 0;
+        responseCount = responses?.length || 0;
+      } catch (error) {
+        console.error('Error checking responses:', error);
+      }
+    }
+    
+    setDeleteModal({ 
+      isOpen: true, 
+      formId, 
+      formTitle: form?.title || 'this form',
+      hasResponses,
+      responseCount,
+      formStatus: form?.status
+    });
+    setActiveMenu(null);
+  };
+
   const handleDelete = async () => {
+    if (isDeleting) return;
+    
+    const { formId, formTitle } = deleteModal;
+    
     try {
-      await formService.deleteForm(deleteModal.formId);
+      setIsDeleting(true);
       setDeleteModal({ isOpen: false, formId: null });
-      fetchForms();
+      
+      const loadingToast = toast.loading(`Deleting form "${formTitle}"...`);
+      
+      const result = await formService.deleteForm(formId);
+      console.log('Delete result:', result);
+      
+      toast.dismiss(loadingToast);
+      
+      // Now result will have { success: true, message: "..." }
+      if (result.success) {
+        toast.success(result.message || `Form deleted successfully`);
+        // Refresh the forms list
+        setTimeout(() => {
+          fetchForms();
+        }, 500);
+      }
+      
     } catch (error) {
-      toast.error('Error deleting form: ' + (error.response?.data?.message || ''));
+      console.error('Error in handleDelete:', error);
+      
+      const errorMessage = error.message || 'Failed to delete form';
+      toast.error(errorMessage);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -95,11 +151,6 @@ const FormList = () => {
 
   const handleEdit = (formId) => {
     navigate(`/form/${formId}/edit`);
-    setActiveMenu(null);
-  };
-
-  const handleDeleteClick = (formId) => {
-    setDeleteModal({ isOpen: true, formId });
     setActiveMenu(null);
   };
 
@@ -332,9 +383,16 @@ const FormList = () => {
         isOpen={deleteModal.isOpen}
         onClose={() => setDeleteModal({ isOpen: false, formId: null })}
         onConfirm={handleDelete}
-        title="Delete Form"
-        message="Are you sure you want to delete this form? This will permanently remove all related data and cannot be undone."
+        title={`Delete ${deleteModal.formTitle || 'Form'}`}
+        message={
+          deleteModal.hasResponses 
+            ? `⚠️ WARNING: This form has ${deleteModal.responseCount} submission(s). Deleting this form will permanently delete all associated responses and data. This action cannot be undone.`
+            : deleteModal.formStatus === 1
+            ? "Are you sure you want to delete this published form? This action cannot be undone."
+            : "Are you sure you want to delete this draft form? This action cannot be undone."
+        }
         variant="danger"
+        confirmText={deleteModal.hasResponses ? "Delete Form & All Responses" : "Yes, Delete"}
       />
 
 

@@ -91,8 +91,10 @@ const PublishedFormList = () => {
     navigate(`/form/${formId}/submission`);
   };
 
-  const handleViewSubmission = (submissionId) => {
-    navigate(`/submission/${submissionId}/view`);
+  const handleViewSubmission = (submission) => {
+    navigate(`/submission/${submission.id}/view`, {
+      state: { submission }
+    });
   };
 
   const formatDueDate = (date) => {
@@ -315,7 +317,7 @@ const PublishedFormList = () => {
                           <td>
                             <button
                               className="submission-action-btn"
-                              onClick={() => handleViewSubmission(submission.id)}
+                              onClick={() => handleViewSubmission(submission)}
                               title="View Details"
                             >
                               <FiFileText />
@@ -351,14 +353,14 @@ const PublishedFormList = () => {
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                     >
-                      &lt;
+                      
                     </button>
                     <button
                         className={`pagination-page-btn ${currentPage !== totalPages ? 'active' : ''}`}
                         onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                         disabled={currentPage === totalPages}
                       >
-                        &gt;
+                          
                       </button>
                   </div>
                 </div>

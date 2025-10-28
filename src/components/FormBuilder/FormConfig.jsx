@@ -75,7 +75,7 @@ const FormConfig = ({
 
             <div className="form-description-field">
               <label className="form-field-label">
-                Form Description
+                Description
               </label>
               <textarea
                 className={`form-description-input ${errors.description ? 'error' : ''}`}

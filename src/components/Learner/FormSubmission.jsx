@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import responseService from '../../services/responseService';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import NavigationBar from '../Common/NavigationBar';
+import Modal from '../Common/Modal';
 import toast from 'react-hot-toast';
 import '../../styles/components/Learner/FormSubmission.css';
 import success from './../../assets/success.png';
@@ -19,6 +20,7 @@ const FormSubmission = () => {
   const [uploadedFiles, setUploadedFiles] = useState({});
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [submissionDetails, setSubmissionDetails] = useState(null);
+  const [showClearModal, setShowClearModal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'Learner') {
@@ -39,7 +41,12 @@ const FormSubmission = () => {
       const initialResponses = {};
       if (formData.questions && Array.isArray(formData.questions)) {
         formData.questions.forEach(question => {
-          initialResponses[question.id] = '';
+          // Check if question is multi-select based on multiple_choice field
+          if (question.multiple_choice === true || question.type === 'checkbox') {
+            initialResponses[question.id] = [];
+          } else {
+            initialResponses[question.id] = '';
+          }
         });
       }
       setResponses(initialResponses);
@@ -104,14 +111,19 @@ const FormSubmission = () => {
     }
   };
 
-  const handleClearForm = () => {
+  const handleClearFormClick = () => {
+    setShowClearModal(true);
+  };
+
+  const handleConfirmClear = () => {
     const clearedResponses = {};
     form.questions?.forEach(question => {
       clearedResponses[question.id] = '';
     });
     setResponses(clearedResponses);
     setUploadedFiles({});
-    toast.success('Form cleared');
+    setShowClearModal(false);
+    toast.success('Form cleared successfully');
   };
 
   const handleSubmit = async (e) => {
@@ -240,24 +252,54 @@ const FormSubmission = () => {
         );
 
       case 'choice':
-      case 'multiple_choice':
       case 'dropdown':
-        return (
-          <select
-            name={`question_${question.id}`}
-            value={responses[question.id] || ''}
-            onChange={(e) => handleInputChange(question.id, e.target.value)}
-            className="form-select"
-            required={question.required}
-          >
-            <option value="">Select an option</option>
-            {question.options?.map((option, idx) => (
-              <option key={idx} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        );
+        // Check if it's multi-select based on multiple_choice field
+        if (question.multiple_choice === true) {
+          // Render as checkboxes for multi-select
+          return (
+            <div className="checkbox-group">
+              {question.options?.map((option, idx) => (
+                <label key={idx} className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    value={typeof option === 'object' ? option.value : option}
+                    checked={Array.isArray(responses[question.id]) ? 
+                      responses[question.id].includes(typeof option === 'object' ? option.value : option) : false}
+                    onChange={(e) => {
+                      const optionValue = typeof option === 'object' ? option.value : option;
+                      const current = Array.isArray(responses[question.id]) 
+                        ? responses[question.id] 
+                        : [];
+                      const updated = e.target.checked 
+                        ? [...current, optionValue]
+                        : current.filter(item => item !== optionValue);
+                      handleInputChange(question.id, updated);
+                    }}
+                  />
+                  <span>{typeof option === 'object' ? option.value : option}</span>
+                </label>
+              ))}
+            </div>
+          );
+        } else {
+          // Render as single select dropdown
+          return (
+            <select
+              name={`question_${question.id}`}
+              value={responses[question.id] || ''}
+              onChange={(e) => handleInputChange(question.id, e.target.value)}
+              className="form-select"
+              required={question.required}
+            >
+              <option value="">Select an option</option>
+              {question.options?.map((option, idx) => (
+                <option key={idx} value={typeof option === 'object' ? option.value : option}>
+                  {typeof option === 'object' ? option.value : option}
+                </option>
+              ))}
+            </select>
+          );
+        }
 
       case 'date':
       case 'date_picker':
@@ -408,9 +450,9 @@ const FormSubmission = () => {
                 </div>
                 
                 <div className="success-text">
-                  <h2 className="success-title">Submitted  Successfully!</h2>
+                  <h2 className="success-title">Submitted Successfully!</h2>
                   <p className="success-message">
-                    Thanks for completing this form. We’ve received your submission successfully.
+                    Thanks for completing this form. We've received your submission successfully.
                   </p>
                   {submissionDetails?.responseId && (
                     <p className="submission-id">
@@ -483,7 +525,7 @@ const FormSubmission = () => {
               <button 
                 type="button" 
                 className="clear-btn"
-                onClick={handleClearForm}
+                onClick={handleClearFormClick}
                 disabled={submitting}
               >
                 Clear Form
@@ -505,6 +547,16 @@ const FormSubmission = () => {
           </form>
         </div>
       </div>
+
+      {/* Clear Form Modal */}
+      <Modal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onConfirm={handleConfirmClear}
+        type="clear"
+        title="Clear Form"
+        message="Are you sure you want to clear all the information you've entered? This action cannot be undone."
+      />
     </>
   );
 };

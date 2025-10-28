@@ -78,9 +78,9 @@ const QuestionEditor = ({
 
   const getQuestionTypeDescription = (type) => {
     const descriptions = {
-      short_text: 'Upto 100 Characters',
-      long_text: 'Upto 500 Characters',
-      number: 'Numeric input only',
+      short_text: 'Short Text(Upto 100 Characters)',
+      long_text: 'Long Text(Upto 500 Characters)',
+      number: 'Numeric  Value',
       date_picker: 'DD/MM/YY',
       choice: 'Dropdown selection',
       file_upload: 'One file allowed'
@@ -126,7 +126,7 @@ const QuestionEditor = ({
   const isDropdown = localQuestion.type === 'choice';
 
   return (
-    <div 
+    <div
       className={`question-editor ${isExpanded ? 'expanded' : 'collapsed'} ${isDragging ? 'dragging' : ''}`}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
@@ -145,8 +145,8 @@ const QuestionEditor = ({
         </div>
 
         <div className="question-header-actions">
-          <div 
-            className="drag-handle" 
+          <div
+            className="drag-handle"
             title="Drag to reorder"
             draggable="true"
             onDragStart={handleDragStart}
@@ -174,13 +174,12 @@ const QuestionEditor = ({
               <label className="type-label">Question Type</label>
               <div className="type-info-box">
                 <div className="type-name">
-                  {getQuestionTypeLabel(localQuestion.type)}
-                </div>
-                <div className="type-description">
                   {getQuestionTypeDescription(localQuestion.type)}
                 </div>
               </div>
             </div>
+
+
 
             {/* Selection Type for Dropdown */}
             {isDropdown && (
@@ -192,8 +191,11 @@ const QuestionEditor = ({
                       type="radio"
                       name={`selection-type-${index}`}
                       value="single"
-                      checked={localQuestion.selection_type !== 'multiple'}
-                      onChange={() => handleFieldChange('selection_type', 'single')}
+                      checked={!localQuestion.multiple_choice}
+                      onChange={() => {
+                        handleFieldChange('single_choice', true);
+                        handleFieldChange('multiple_choice', false);
+                      }}
                     />
                     <span>Single Select</span>
                   </label>
@@ -202,8 +204,11 @@ const QuestionEditor = ({
                       type="radio"
                       name={`selection-type-${index}`}
                       value="multiple"
-                      checked={localQuestion.selection_type === 'multiple'}
-                      onChange={() => handleFieldChange('selection_type', 'multiple')}
+                      checked={localQuestion.multiple_choice === true}
+                      onChange={() => {
+                        handleFieldChange('single_choice', false);
+                        handleFieldChange('multiple_choice', true);
+                      }}
                     />
                     <span>Multi Select</span>
                   </label>
@@ -279,7 +284,7 @@ const QuestionEditor = ({
               >
                 <img src={elements} alt="Copy" className="action-icon" />
               </button>
-              
+
               {/* Delete Button */}
               <button
                 className="action-button delete"

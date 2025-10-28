@@ -10,6 +10,7 @@ import FormEditorPage from './pages/FormEditorPage';
 import ViewFormPage from './pages/ViewFormPage';
 import FormSubmissionPage from './pages/FormSubmissionPage';
 import FormSubmission from './components/Learner/FormSubmission';
+ //import SubmissionView from './components/Learner/SubmissionView';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
@@ -92,6 +93,15 @@ function App() {
               </ProtectedRoute>
             }
           />
+          {/* <Route
+            path="/submission/:submissionId/view"
+            element={
+              <ProtectedRoute allowedRoles={['Learner']}>
+                <SubmissionView />
+              </ProtectedRoute>
+            }
+          />
+          */}
           
           {/* Shared Routes */}
           <Route path="/form/:formId/view" element={<ViewFormPage />} />

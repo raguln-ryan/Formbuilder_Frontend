@@ -3,8 +3,7 @@
   justify-content: center;
   align-items: flex-start;
   padding: 40px 20px;
-  width : 1300px;
-  height : 1300px;
+  height : 2200px;
   background-color: #f8f9fc;
   font-family: "Inter", "Segoe UI", sans-serif;
   margin-top: 60px;
@@ -13,7 +12,7 @@
 .form-submission-card {
   background: white;
   width: 916px;
-height: 1000px;
+height: 1600px;
   border-radius: 10px;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
   border-top: solid 10px #6c63ff;

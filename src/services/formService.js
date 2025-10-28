@@ -1,4 +1,5 @@
 import api from './api';
+import responseService from './responseService';
 
 const formService = {
   // Get all forms
@@ -57,12 +58,30 @@ const formService = {
   },
 
   // Delete form
-  deleteForm: async (id) => {
+  deleteForm: async (formId) => {
     try {
-      const response = await api.delete(`/Form/${id}`);
-      return response.data;
+      console.log('🗑️ Attempting to delete form:', formId);
+    
+      // Remove the /api prefix since it's already in your base URL
+      const response = await api.delete(`/Form/${formId}`);  // ← Changed from /api/Form to just /Form
+    
+      console.log('✅ Delete response:', response);
+    
+      if (response.status === 200 || response.status === 204) {
+        return {
+          success: true,
+          message: response.data?.message || 'Form deleted successfully'
+        };
+      }
+    
+      throw new Error('Unexpected response status');
     } catch (error) {
-      console.error('Error deleting form:', error);
+      console.error('❌ Delete error:', error);
+    
+      if (error.response?.data) {
+        throw new Error(error.response.data.message || error.response.data || 'Failed to delete form');
+      }
+    
       throw error;
     }
   },
@@ -86,6 +105,16 @@ const formService = {
     } catch (error) {
       console.error('Error toggling form status:', error);
       throw error;
+    }
+  },
+
+  // Add method to check if form has responses
+  getFormResponses: async (formId) => {
+    try {
+      return await responseService.getFormResponses(formId);
+    } catch (error) {
+      console.error('Error fetching form responses:', error);
+      return [];
     }
   }
 };
