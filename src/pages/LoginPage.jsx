@@ -104,59 +104,84 @@ const LoginPage = () => {
 
   return (
     <div className="login-container">
-      <div className="login-card">
-        <h2>Login</h2>
-        
-        {/* Only show error if it exists */}
-        {error && (
-          <div className="error-message">{error}</div>
-        )}
-        
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="Enter your email"
-              required
-              autoComplete="email"
-            />
-          </div>
+      {/* Left Section */}
+      <div className="login-left">
+        <div className="overlay">
+          <div className="logo">Welcome to Form Builder App!</div>
           
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="Enter your password"
-              required
-              autoComplete="current-password"
-            />
+          <div className="caption">
+            <h2>Build Forms,<br />Manage Learning</h2>
+            <p>Create dynamic forms and manage your learning journey</p>
           </div>
-          
-          <button 
-            type="submit" 
-            className="submit-btn"
-            disabled={loading}
-          >
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-        
-        <div className="auth-switch">
-          <p>
+        </div>
+      </div>
+
+      {/* Right Section */}
+      <div className="login-right">
+        <div className="form-box">
+          <h2>Log in to your account</h2>
+          <p className="form-subtitle">
             Don't have an account?{' '}
-            <Link to="/register" className="auth-link">
-              Register as Learner
+            <Link to="/register" className="toggle">
+              Sign up
             </Link>
           </p>
+          
+          {/* Only show error if it exists */}
+          {error && (
+            <div className="error-message">{error}</div>
+          )}
+          
+          <form onSubmit={handleSubmit} className="login-form">
+            <div className="form-group">
+
+              <label htmlFor="email" style = {{color: 'white'}}>Email</label>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                placeholder="Enter your email"
+                required
+                autoComplete="email"
+              />
+            </div>
+            
+            <div className="form-group">
+              <label htmlFor="password" style = {{color: 'white'}}>Password</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password"
+                required
+                autoComplete="current-password"
+              />
+            </div>
+            
+            <button 
+              type="submit" 
+              className="submit-btn"
+              disabled={loading}
+            >
+              {loading ? 'Logging in...' : 'Log in'}
+            </button>
+          </form>
+          
+          <div className="auth-switch">
+            <p>
+              New to FormBuilder?{' '}
+              <Link to="/register" className="auth-link">
+                Create an account
+              </Link>
+            </p>
+          </div>
+
+         
+         
         </div>
       </div>
     </div>

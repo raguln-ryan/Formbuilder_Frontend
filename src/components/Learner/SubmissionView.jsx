@@ -25,19 +25,15 @@
         if (location.state?.submission) {
           const submissionData = location.state.submission;
           console.log('📋 FULL Submission from state:', submissionData);
-          console.log('📋 All properties:', Object.keys(submissionData));
-        
-          // Log each property to see what's inside
-          Object.keys(submissionData).forEach(key => {
-            console.log(`📌 ${key}:`, submissionData[key]);
-          });
         
           setSubmission(submissionData);
           fetchFormDetails(submissionData.formId);
         
-          // Try to get response details
-          if (submissionData.id || submissionData.responseId) {
-            fetchResponseDetails(submissionData.id || submissionData.responseId);
+          // Only try to get response details if we don't have details already
+          if (!submissionData.details || submissionData.details.length === 0) {
+            if (submissionData.id || submissionData.responseId) {
+              fetchResponseDetails(submissionData.id || submissionData.responseId);
+            }
           }
         } else {
           // If no data passed, fetch from my-submissions
@@ -62,11 +58,6 @@
         console.log('✅ Found submission:', foundSubmission);
       
         if (foundSubmission) {
-          // Log all properties
-          Object.keys(foundSubmission).forEach(key => {
-            console.log(`📌 ${key}:`, foundSubmission[key]);
-          });
-        
           setSubmission(foundSubmission);
         
           // Fetch the form details to get questions
@@ -74,8 +65,10 @@
             await fetchFormDetails(foundSubmission.formId);
           }
         
-          // Try to get full response details
-          await fetchResponseDetails(foundSubmission.id || foundSubmission.responseId);
+          // Only try to get response details if we don't have details already
+          if (!foundSubmission.details || foundSubmission.details.length === 0) {
+            await fetchResponseDetails(foundSubmission.id || foundSubmission.responseId);
+          }
         } else {
           throw new Error('Submission not found');
         }
@@ -92,30 +85,16 @@
         const details = await responseService.getResponseDetails(responseId);
         console.log('📊 Response details from API:', details);
         setResponseDetails(details);
-      
-        // If details contains answers, log them
-        if (details?.answers) {
-          console.log('✅ Found answers in response details:', details.answers);
-        }
-        if (details?.fileUploads) {
-          console.log('📁 Found file uploads:', details.fileUploads);
-        }
       } catch (error) {
-        console.error('❌ Error fetching response details:', error);
-      
-        // If API call fails, try to parse from submission.details
-        if (submission?.details) {
-          console.log('🔄 Trying to parse details from submission...');
-          try {
-            const parsedDetails = typeof submission.details === 'string' 
-              ? JSON.parse(submission.details) 
-              : submission.details;
-            console.log('📊 Parsed details:', parsedDetails);
-            setResponseDetails(parsedDetails);
-          } catch (e) {
-            console.error('Could not parse details:', e);
-          }
+        // Don't show error if it's 403 - we likely have the data already
+        if (error.response?.status === 403) {
+          console.log('⚠️ Response details endpoint returned 403 - using submission.details instead');
+        } else {
+          console.error('❌ Error fetching response details:', error);
         }
+      
+        // We can still display the form using submission.details
+        // No need to set an error state
       }
     };
 
@@ -142,71 +121,71 @@
       });
     };
 
-    const getAnswerValue = (question, questionIndex) => {
-      console.log(`\n🔍 Looking for answer - Q${questionIndex + 1}: "${question.text || question.question}"`);
-      console.log('Question ID:', question.id || question._id);
+    const getAnswerValue = (question) => {
+      console.log(`\n🔍 Looking for answer for question: "${question.text}"`);
+      console.log('Question ID:', question.id);
+      console.log('Question Type:', question.type);
     
-      // Check all possible sources for answers
-      const sources = [
-        { name: 'responseDetails', data: responseDetails },
-        { name: 'submission.details', data: submission?.details },
-        { name: 'submission', data: submission }
-      ];
+      // First check submission.details (this is where the data actually is)
+      if (submission?.details && Array.isArray(submission.details)) {
+        console.log('📊 Checking submission.details array');
+      
+        // Find the answer for this specific question by questionId
+        const answerObj = submission.details.find(detail => 
+          String(detail.questionId) === String(question.id)
+        );
+      
+        if (answerObj) {
+          console.log('✅ Found answer object:', answerObj);
+        
+          // Check if it's a file upload answer
+          if (answerObj.answer && typeof answerObj.answer === 'string') {
+            // Check for file upload pattern [FILE_UPLOADED:filename]
+            const fileMatch = answerObj.answer.match(/\[FILE_UPLOADED:(.*?)\]/);
+            if (fileMatch) {
+              console.log('📁 Found file upload:', fileMatch[1]);
+              return {
+                isFile: true,
+                fileName: fileMatch[1]
+              };
+            }
+          }
+        
+          // Return the regular answer
+          return answerObj.answer || '';
+        }
+      }
     
-      for (const source of sources) {
-        if (!source.data) continue;
-      
-        console.log(`Checking ${source.name}:`, source.data);
-      
-        let data = source.data;
-      
-        // Parse if string
-        if (typeof data === 'string') {
-          try {
-            data = JSON.parse(data);
-            console.log(`Parsed ${source.name}:`, data);
-          } catch (e) {
-            continue;
+      // Fallback: Check responseDetails if available (though it's returning 403)
+      if (responseDetails) {
+        // For file upload questions
+        if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
+          if (responseDetails.fileUploads && Array.isArray(responseDetails.fileUploads)) {
+            const fileUpload = responseDetails.fileUploads.find(f => 
+              String(f.questionId) === String(question.id)
+            );
+            
+            if (fileUpload) {
+              console.log('✅ Found file upload in responseDetails:', fileUpload);
+              return {
+                isFile: true,
+                fileName: fileUpload.fileName,
+                fileType: fileUpload.fileType,
+                fileSize: fileUpload.fileSize
+              };
+            }
           }
         }
       
-        // Check for answers array
-        if (data.answers && Array.isArray(data.answers)) {
-          console.log(`Found answers array in ${source.name}:`, data.answers);
-        
-          // Try to find by questionId
-          const answer = data.answers.find(a => {
-            const matches = String(a.questionId) === String(question.id) || 
-                         String(a.questionId) === String(question._id) ||
-                         String(a.question) === String(question.id) ||
-                         String(a.question) === String(question._id);
-            if (matches) {
-              console.log('✅ Found by ID match:', a);
-            }
-            return matches;
-          });
+        // For regular answers
+        if (responseDetails.answers && Array.isArray(responseDetails.answers)) {
+          const answer = responseDetails.answers.find(a => 
+            String(a.questionId) === String(question.id)
+          );
         
           if (answer) {
-            const value = answer.answer || answer.value || answer.response || answer.text || '';
-            console.log(`✅ Answer value: "${value}"`);
-            return value;
+            return answer.answer || answer.value || '';
           }
-        
-          // Try by index
-          if (data.answers[questionIndex]) {
-            const answerByIndex = data.answers[questionIndex];
-            console.log(`Found by index [${questionIndex}]:`, answerByIndex);
-            const value = answerByIndex.answer || answerByIndex.value || answerByIndex.response || answerByIndex;
-            console.log(`✅ Answer value by index: "${value}"`);
-            return value;
-          }
-        }
-      
-        // Check if data itself is answers array
-        if (Array.isArray(data) && data[questionIndex]) {
-          console.log(`Found in array at index [${questionIndex}]:`, data[questionIndex]);
-          const answer = data[questionIndex];
-          return answer.answer || answer.value || answer;
         }
       }
     
@@ -214,64 +193,67 @@
       return '';
     };
 
-    const renderAnswer = (question, questionIndex) => {
-      const answerValue = getAnswerValue(question, questionIndex);
+    const renderAnswer = (question) => {
+      const result = getAnswerValue(question);
     
-      // For file upload questions
-      if (question.type === 'file_upload' || question.type === 'file') {
-        console.log(`📁 Checking for file upload - Q${questionIndex + 1}`);
-      
-        // Check for file info in various places
-        let fileInfo = null;
-      
-        // Check responseDetails
-        if (responseDetails) {
-          if (responseDetails.fileUploads && Array.isArray(responseDetails.fileUploads)) {
-            fileInfo = responseDetails.fileUploads.find(f => 
-              String(f.questionId) === String(question.id) || 
-              String(f.questionId) === String(question._id)
-            ) || responseDetails.fileUploads[questionIndex];
-          }
-        
-          if (!fileInfo && responseDetails.attachments) {
-            fileInfo = responseDetails.attachments.find(f => 
-              String(f.questionId) === String(question.id) || 
-              String(f.questionId) === String(question._id)
-            );
-          }
-        }
-      
-        console.log('File info found:', fileInfo);
-      
-        if (fileInfo?.fileName) {
+      // Check if it's a file result
+      if (result && typeof result === 'object' && result.isFile) {
+        if (result.fileName) {
           return (
-            <button className="upload-link">
-              View Uploaded File: {fileInfo.fileName}
-            </button>
+            <div className="file-upload-display">
+              <div style={{
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                padding: '8px 12px',
+                borderRadius: '4px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}>
+                📎 {result.fileName}
+                {result.fileSize && (
+                  <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                    ({(result.fileSize / 1024).toFixed(2)} KB)
+                  </span>
+                )}
+              </div>
+            </div>
           );
+        } else {
+          return <span style={{ color: '#9ca3af' }}>No file uploaded</span>;
         }
-      
-        // Check if answerValue looks like a filename
-        if (answerValue && answerValue.includes('.')) {
-          return (
-            <button className="upload-link">
-              View Uploaded File: {answerValue}
-            </button>
-          );
-        }
-      
-        return <span className="no-answer">No file uploaded</span>;
       }
-
+    
       // For date questions, format the date
       if (question.type === 'date' || question.type === 'date_picker') {
-        if (answerValue && answerValue !== '-') {
-          return formatDate(answerValue);
+        if (result && result !== '-' && result !== '') {
+          return formatDate(result);
         }
       }
-
+    
+      // For checkbox or multi-select questions
+      if (question.type === 'checkbox' || question.multiple_choice === true) {
+        if (result && typeof result === 'string' && result.includes(',')) {
+          const items = result.split(',').map(item => item.trim());
+          return (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {items.map((item, idx) => (
+                <span key={idx} style={{
+                  background: '#e5e7eb',
+                  padding: '4px 12px',
+                  borderRadius: '16px',
+                  fontSize: '0.875rem'
+                }}>
+                  {item}
+                </span>
+              ))}
+            </div>
+          );
+        }
+      }
+    
       // For other question types
-      return answerValue || '-';
+      return result || '-';
     };
 
     if (loading) return <LoadingSpinner />;
@@ -304,7 +286,8 @@
 
             {formDetails?.questions ? (
               formDetails.questions.map((question, index) => {
-                const answerValue = getAnswerValue(question, index);
+                const answerContent = getAnswerValue(question);
+                const isFileAnswer = answerContent && typeof answerContent === 'object' && answerContent.isFile;
               
                 return (
                   <div key={question.id || question._id || index} className="submission-form-group">
@@ -318,20 +301,23 @@
                       <p className="submission-form-hint">{question.description}</p>
                     )}
                   
+                    {/* Render based on question type */}
                     {question.type === 'long_text' || question.type === 'long_answer' || question.type === 'paragraph' ? (
                       <textarea 
                         className="submission-form-textarea" 
-                        value={answerValue}
+                        value={typeof answerContent === 'string' ? answerContent : ''}
                         readOnly
                         placeholder="-"
                       />
-                    ) : question.type === 'file_upload' || question.type === 'file' ? (
-                      renderAnswer(question, index)
+                    ) : isFileAnswer ? (
+                      <div className="submission-file-display">
+                        {renderAnswer(question)}
+                      </div>
                     ) : (
                       <input 
                         type="text" 
                         className="submission-form-input" 
-                        value={answerValue}
+                        value={typeof answerContent === 'string' ? renderAnswer(question) : ''}
                         readOnly
                         placeholder="-"
                       />
@@ -341,14 +327,7 @@
               })
             ) : (
               <div className="form-group">
-                <p>Debug Information:</p>
-                <pre style={{ fontSize: '11px', background: '#f5f5f5', padding: '10px', borderRadius: '4px', overflow: 'auto' }}>
-                  <strong>Submission:</strong>
-                  {JSON.stringify(submission, null, 2)}
-                
-                  <strong>Response Details:</strong>
-                  {JSON.stringify(responseDetails, null, 2)}
-                </pre>
+                <p>Loading form details...</p>
               </div>
             )}
           </div>

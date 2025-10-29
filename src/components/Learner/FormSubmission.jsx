@@ -44,6 +44,9 @@ const FormSubmission = () => {
           // Check if question is multi-select based on multiple_choice field
           if (question.multiple_choice === true || question.type === 'checkbox') {
             initialResponses[question.id] = [];
+          } else if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
+            // Don't initialize file upload questions in responses
+            // They will be handled separately
           } else {
             initialResponses[question.id] = '';
           }
@@ -59,7 +62,7 @@ const FormSubmission = () => {
     }
   };
 
-  // ADD THIS FUNCTION - Convert file to base64
+  // Convert file to base64
   const convertFileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -74,6 +77,12 @@ const FormSubmission = () => {
   };
 
   const handleInputChange = (questionId, value) => {
+    // Don't store file upload values in responses
+    const question = form.questions?.find(q => q.id === questionId);
+    if (question?.type?.toLowerCase() === 'file_upload' || question?.type?.toLowerCase() === 'file') {
+      return; // Skip storing file names in responses
+    }
+    
     setResponses(prev => ({
       ...prev,
       [questionId]: value
@@ -107,7 +116,7 @@ const FormSubmission = () => {
         ...prev,
         [questionId]: file
       }));
-      handleInputChange(questionId, file.name);
+      // Don't call handleInputChange for files
     }
   };
 
@@ -118,7 +127,13 @@ const FormSubmission = () => {
   const handleConfirmClear = () => {
     const clearedResponses = {};
     form.questions?.forEach(question => {
-      clearedResponses[question.id] = '';
+      if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
+        // Skip file upload questions
+      } else if (question.multiple_choice === true || question.type === 'checkbox') {
+        clearedResponses[question.id] = [];
+      } else {
+        clearedResponses[question.id] = '';
+      }
     });
     setResponses(clearedResponses);
     setUploadedFiles({});
@@ -129,6 +144,14 @@ const FormSubmission = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    // Prevent double submission
+    if (submitting) {
+      return;
+    }
+
+    console.log('Current responses:', responses);
+    console.log('Current uploaded files:', uploadedFiles);
+    
     // Validate required fields
     const requiredQuestions = form.questions?.filter(q => q.required) || [];
     for (const question of requiredQuestions) {
@@ -136,6 +159,11 @@ const FormSubmission = () => {
       if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
         if (!uploadedFiles[question.id]) {
           toast.error(`Please upload file for: ${question.text}`);
+          return;
+        }
+      } else if (question.multiple_choice === true || question.type === 'checkbox') {
+        if (!responses[question.id] || responses[question.id].length === 0) {
+          toast.error(`Please answer: ${question.text}`);
           return;
         }
       } else {
@@ -171,24 +199,34 @@ const FormSubmission = () => {
         }
       }
       
+      // Prepare answers - FIXED: Only include non-file questions
+      const answers = [];
+      form.questions?.forEach(question => {
+        // Skip file upload questions completely
+        if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
+          return; // Skip this iteration
+        }
+        
+        // Include the answer for this question
+        const answer = responses[question.id];
+        if (answer !== undefined) {
+          answers.push({
+            questionId: question.id,
+            answer: Array.isArray(answer) ? answer.join(', ') : (answer || '').toString()
+          });
+        }
+      });
+
       // Prepare submission data matching backend FormSubmissionDto
       const submissionData = {
         formId: formId,
-        answers: Object.entries(responses)
-          .filter(([questionId, answer]) => {
-            // Don't include file upload questions in answers
-            const question = form.questions?.find(q => q.id === questionId);
-            return question?.type?.toLowerCase() !== 'file_upload' && 
-                   question?.type?.toLowerCase() !== 'file';
-          })
-          .map(([questionId, answer]) => ({
-            questionId: questionId,
-            answer: Array.isArray(answer) ? answer.join(', ') : (answer || '').toString()
-          })),
+        answers: answers,
         fileUploads: fileUploads
       };
 
       console.log('Submitting data:', submissionData);
+      console.log('Answers array:', submissionData.answers);
+      console.log('File uploads array:', submissionData.fileUploads);
 
       const result = await responseService.submitResponse(submissionData);
       
@@ -354,7 +392,6 @@ const FormSubmission = () => {
                         delete newFiles[question.id];
                         return newFiles;
                       });
-                      handleInputChange(question.id, '');
                     }}
                     className="remove-file-btn"
                   >
@@ -507,6 +544,7 @@ const FormSubmission = () => {
             {form?.description || 'Please fill out this form completely and accurately.'}
           </p>
 
+          {/* Form tag wraps all content including buttons */}
           <form onSubmit={handleSubmit}>
             {form?.questions?.map((question, index) => (
               <div key={question.id} className="question-container">
@@ -521,35 +559,40 @@ const FormSubmission = () => {
               </div>
             ))}
 
-
+            {/* Buttons are inside the form */}
             <div className="form-footer">
-             
+              <div className="form-buttons">
+                <button 
+                  type="button" 
+                  className="clear-btn"
+                  onClick={handleClearFormClick}
+                  disabled={submitting}
+                >
+                  Clear Form
+                </button>
+                
+                <div className="warning-message">
+                  <p style={{
+                    marginTop: "7px",
+                    fontSize: "14px",
+                    fontWeight: "400",
+                    color: "#202223"
+                  }}>
+                    This form cannot be saved temporarily, please submit once completed
+                  </p>
+                </div>
+                
+                <button 
+                  type="submit" 
+                  className="submit-btn"
+                  disabled={submitting}
+                >
+                  {submitting ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
             </div>
           </form>
         </div>
-      </div>
-      <div>
-            <div className="form-buttons">
-              <button 
-                type="button" 
-                className="clear-btn"
-                onClick={handleClearFormClick}
-                disabled={submitting}
-              >
-                Clear Form
-              </button>
-              <div className="warning-message">
-                <p style={{marginTop:"7px",fontSize:"14px",fontWeight:"400",color:"#202223"}}>This form cannot be save temporarily, please submit once completed</p>
-              </div>
-              <button 
-                type="submit" 
-                className="submit-btn"
-                disabled={submitting}
-              >
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
-            </div>
-
       </div>
 
       {/* Clear Form Modal */}
