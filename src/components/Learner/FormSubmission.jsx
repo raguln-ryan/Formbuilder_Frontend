@@ -521,6 +521,14 @@ const FormSubmission = () => {
               </div>
             ))}
 
+
+            <div className="form-footer">
+             
+            </div>
+          </form>
+        </div>
+      </div>
+      <div>
             <div className="form-buttons">
               <button 
                 type="button" 
@@ -530,6 +538,9 @@ const FormSubmission = () => {
               >
                 Clear Form
               </button>
+              <div className="warning-message">
+                <p style={{marginTop:"7px",fontSize:"14px",fontWeight:"400",color:"#202223"}}>This form cannot be save temporarily, please submit once completed</p>
+              </div>
               <button 
                 type="submit" 
                 className="submit-btn"
@@ -539,11 +550,6 @@ const FormSubmission = () => {
               </button>
             </div>
 
-            <div className="form-footer">
-             
-            </div>
-          </form>
-        </div>
       </div>
 
       {/* Clear Form Modal */}

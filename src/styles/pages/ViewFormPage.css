@@ -651,7 +651,7 @@
   color: #6b7280;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 2px solid #D8D8D8;
 }
 
 .submission-form-group {
@@ -701,7 +701,7 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 0.9375rem;
-  background-color: #f9fafb;
+  background-color: #D8D8D8;
   color: #1f2937;
   margin-left: 2rem;
   width: calc(100% - 2rem);
@@ -715,8 +715,9 @@
 
 .submission-form-input:read-only,
 .submission-form-textarea:read-only {
-  background-color: #f9fafb;
+  background-color: #F3F2F3;
   cursor: not-allowed;
+  border:1px solid #D8D8D8;
 }
 
 .upload-link {

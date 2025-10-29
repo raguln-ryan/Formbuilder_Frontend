@@ -36,7 +36,6 @@
 
 /* Header card container */
 .form-header-card {
-  width: 1185px;
   flex: 1;
   background: #FFFFFF;
   border-top: 8px solid #5D38DF;
@@ -94,7 +93,7 @@
 
 .drop-zone.empty {
   display: flex;
-  height : 220px;
+  height : 320px;
   background: #F2EFFC;
   align-items: center;
   justify-content: center;

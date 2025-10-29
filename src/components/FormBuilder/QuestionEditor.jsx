@@ -23,10 +23,12 @@ const QuestionEditor = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [localQuestion, setLocalQuestion] = useState(question);
 
+  console.log(localQuestion)
+
   const handleFieldChange = (field, value) => {
     const updated = { ...localQuestion, [field]: value };
     setLocalQuestion(updated);
-    onUpdate(updated);
+    onUpdate(updated); // This updates the parent component
   };
 
   const handleOptionChange = (optionIndex, value) => {
@@ -131,7 +133,7 @@ const QuestionEditor = ({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      <div className="question-header" onClick={() => setIsExpanded(!isExpanded)}>
+      {/* <div className="question-header" onClick={() => setIsExpanded(!isExpanded)}>
         <div className="question-header-left">
           <span className="question-number">{index + 1}</span>
           <div className="question-info">
@@ -156,29 +158,70 @@ const QuestionEditor = ({
             <img src={Threedot} alt="Drag" className="drag-icon" />
           </div>
         </div>
-      </div>
+      </div> */}
 
       {isExpanded && (
         <div className="question-body">
+      
           <div className="question-form">
             <Input
-              label="Question Text"
               value={localQuestion.question || ''}
               onChange={(e) => handleFieldChange('question', e.target.value)}
-              placeholder="Enter your question"
+              placeholder="Untitled question"
               required
             />
+            
 
             {/* Question Type Display - Disabled */}
             <div className="question-type-display">
               <label className="type-label">Question Type</label>
               <div className="type-info-box">
                 <div className="type-name">
-                  {getQuestionTypeDescription(localQuestion.type)}
+                  {
+                    localQuestion.type === 'date_picker' ?
+                    localQuestion.date_format :
+                    getQuestionTypeDescription(localQuestion.type)
+                  }
                 </div>
               </div>
             </div>
 
+            {localQuestion.type === 'date_picker' && (
+              <div className="date-wrap">
+                {/* <div className="date-input-wrapper">
+                  <input 
+                    className="preview-input" 
+                    placeholder={localQuestion.date_format || "DD/MM/YYYY"} 
+                    value=""
+                    disabled 
+                  />
+                </div> */}
+                {/* Date Format Radio Buttons */}
+                <div className="date-format-group">
+                  <span className="format-label">Date Format:</span>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name={`dateformat-${localQuestion._id}`}
+                      value="DD/MM/YYYY"
+                      checked={(localQuestion.date_format || "DD/MM/YYYY") === "DD/MM/YYYY"}
+                      onChange={() => handleFieldChange('date_format', 'DD/MM/YYYY')}
+                    />
+                    <span>DD/MM/YYYY</span>
+                  </label>
+                  <label className="radio-option">
+                    <input
+                      type="radio"
+                      name={`dateformat-${localQuestion._id}`}
+                      value="DD-MM-YYYY"
+                      checked={localQuestion.date_format === "DD-MM-YYYY"}
+                      onChange={() => handleFieldChange('date_format', 'DD-MM-YYYY')}
+                    />
+                    <span>DD-MM-YYYY</span>
+                  </label>
+                </div>
+              </div>
+            )}
 
 
             {/* Selection Type for Dropdown */}

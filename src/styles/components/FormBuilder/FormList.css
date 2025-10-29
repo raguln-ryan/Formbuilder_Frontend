@@ -259,7 +259,7 @@
 }
 
 .toggle-switch input:checked + .toggle-slider {
-  background-color: #4CAF50;
+  background-color: #4a2db3;
 }
 
 .toggle-switch input:checked + .toggle-slider:before {

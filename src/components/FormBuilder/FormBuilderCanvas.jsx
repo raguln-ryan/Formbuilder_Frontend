@@ -33,7 +33,7 @@ const FormBuilderCanvas = ({
       const newQuestion = {
         _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         type: fieldType.type,
-        question: `New ${fieldType.label} Question`,
+        question: '',
         description_enabled: false,
         description: '',
         single_choice: fieldType.type === 'choice' ? true : false,
@@ -78,7 +78,7 @@ const FormBuilderCanvas = ({
     onQuestionsChange(newQuestions);
     
     toast.success('Question deleted', {
-      icon: '🗑️',
+    
       duration: 3000,
     });
   };
@@ -119,7 +119,7 @@ const FormBuilderCanvas = ({
     onQuestionsChange(newQuestions);
     
     toast.success('Question duplicated successfully!', {
-      icon: '📋',
+      
       duration: 2000,
     });
   };
@@ -165,6 +165,7 @@ const FormBuilderCanvas = ({
                   onDelete={() => handleQuestionDelete(index)}
                   onMove={(direction) => handleQuestionMove(index, direction)}
                   onDuplicate={handleQuestionDuplicate}
+                
                 />
               ))}
             </div>

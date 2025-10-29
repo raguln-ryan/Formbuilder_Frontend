@@ -75,14 +75,15 @@
 
     .submission-form-input,
     .submission-form-textarea {
-      width: 100%;
+     
       border: 1px solid #d8d8d8;
       border-radius: 6px;
-      background-color: #f5f5f5;
+      background-color: #F3F2F3;
       padding: 10px 12px;
       font-size: 13px;
       color: #1d1d1f;
       outline: none;
+      margin-left: 0px !important;
     }
 
     .submission-form-input[readonly],
@@ -93,6 +94,7 @@
     .submission-form-input::placeholder,
     .submission-form-textarea::placeholder {
       color: #8b8b8b;
+      background-color: #D8D8D8 !important;
     }
 
     .submission-form-input:focus,
