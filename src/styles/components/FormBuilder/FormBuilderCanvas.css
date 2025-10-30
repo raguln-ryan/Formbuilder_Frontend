@@ -136,11 +136,40 @@
 }
 
 .questions-container {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  position: relative;
 }
 
+.question-editor {
+  transition: all 0.3s ease;
+}
+
+.question-editor.dragging {
+  opacity: 0.5;
+  cursor: move;
+}
+
+.question-editor.drag-over {
+  border-top: 3px solid #5D38DF;
+}
+
+.question-editor.is-dragging {
+  opacity: 0.4;
+  transform: scale(0.95);
+}
+
+.drag-handle-wrapper {
+  cursor: move;
+  display: flex;
+    cursor: move;
+    align-items: center;
+    justify-content: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.drag-handle-wrapper:active {
+  cursor: grabbing;
+}
 
 .disabled {
   pointer-events: none;

@@ -13,6 +13,8 @@ const FormBuilderCanvas = ({
   formId = ''
 }) => {
   const [draggedOver, setDraggedOver] = useState(false);
+  const [draggedQuestionIndex, setDraggedQuestionIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -67,7 +69,6 @@ const FormBuilderCanvas = ({
     const newQuestions = [...questions];
     newQuestions[index] = updatedQuestion;
     onQuestionsChange(newQuestions);
-    
   };
 
   const handleQuestionDelete = (index) => {
@@ -79,7 +80,6 @@ const FormBuilderCanvas = ({
     onQuestionsChange(newQuestions);
     
     toast.success('Question deleted', {
-    
       duration: 3000,
     });
   };
@@ -120,8 +120,79 @@ const FormBuilderCanvas = ({
     onQuestionsChange(newQuestions);
     
     toast.success('Question duplicated successfully!', {
-      
       duration: 2000,
+    });
+  };
+
+  // New drag and drop handlers for reordering questions
+  const handleQuestionDragStart = (index) => {
+    setDraggedQuestionIndex(index);
+  };
+
+  const handleQuestionDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedQuestionIndex === null) return;
+    
+    setDragOverIndex(index);
+    
+    // Add visual feedback
+    const dropIndicator = e.currentTarget;
+    if (dropIndicator) {
+      dropIndicator.classList.add('drag-over');
+    }
+  };
+
+  const handleQuestionDrop = (e, dropIndex) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Remove visual feedback
+    const dropIndicator = e.currentTarget;
+    if (dropIndicator) {
+      dropIndicator.classList.remove('drag-over');
+    }
+    
+    if (draggedQuestionIndex === null || draggedQuestionIndex === dropIndex) {
+      setDraggedQuestionIndex(null);
+      setDragOverIndex(null);
+      return;
+    }
+
+    const newQuestions = [...questions];
+    const draggedQuestion = newQuestions[draggedQuestionIndex];
+    
+    // Remove the dragged question from its original position
+    newQuestions.splice(draggedQuestionIndex, 1);
+    
+    // Insert it at the new position
+    newQuestions.splice(dropIndex, 0, draggedQuestion);
+    
+    // Update the order property for all questions
+    newQuestions.forEach((q, index) => {
+      q.order = index;
+    });
+    
+    // Update the state
+    onQuestionsChange(newQuestions);
+    
+    // Reset drag state
+    setDraggedQuestionIndex(null);
+    setDragOverIndex(null);
+    
+    toast.success('Question reordered', {
+      icon: '↕️',
+      duration: 1500,
+    });
+  };
+
+  const handleQuestionDragEnd = () => {
+    // Clean up any remaining drag states
+    setDraggedQuestionIndex(null);
+    setDragOverIndex(null);
+    
+    // Remove any remaining visual feedback
+    document.querySelectorAll('.drag-over').forEach(el => {
+      el.classList.remove('drag-over');
     });
   };
 
@@ -166,7 +237,11 @@ const FormBuilderCanvas = ({
                   onDelete={() => handleQuestionDelete(index)}
                   onMove={(direction) => handleQuestionMove(index, direction)}
                   onDuplicate={handleQuestionDuplicate}
-                
+                  onDragStart={handleQuestionDragStart}
+                  onDragEnd={handleQuestionDragEnd}
+                  onDragOver={handleQuestionDragOver}
+                  onDrop={handleQuestionDrop}
+                  isDragging={draggedQuestionIndex === index}
                 />
               ))}
             </div>
