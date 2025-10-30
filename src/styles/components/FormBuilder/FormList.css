@@ -289,6 +289,7 @@
   background-color: #80D8BC40;
   /* 40 in hex = 25% opacity */
   border-color: #3AB876;
+  border-radius: 6px;
   border  : solid 1px #3AB876;
   color: #2E8B57;
 }
@@ -297,6 +298,7 @@
   background-color: #FFB74D33;
   /* Light orange with opacity */
   border-color: #FF9800;
+   border-radius: 6px;
   border : solid 1px #FF9800;
   color: #E65100;
 }

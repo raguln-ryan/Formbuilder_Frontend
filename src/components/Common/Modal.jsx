@@ -11,7 +11,8 @@ const Modal = ({
   variant = 'default',
   confirmText, 
   cancelText = 'Cancel',
-  type = 'delete' // 'delete', 'publish', or 'clear'
+  type = 'delete', // 'delete', 'publish', 'clear', or 'submitted'
+  lastSubmissionDate // New prop for submission date
 }) => {
   if (!isOpen) return null;
 
@@ -24,6 +25,8 @@ const Modal = ({
         return 'Yes, Publish';
       case 'clear':
         return 'Yes, Clear';
+      case 'submitted':
+        return 'Yes, Continue';
       case 'delete':
       default:
         return 'Yes, Delete';
@@ -39,10 +42,23 @@ const Modal = ({
         return 'Publish Form';
       case 'clear':
         return 'Clear Form';
+      case 'submitted':
+        return 'Form Already Submitted';
       case 'delete':
       default:
         return 'Delete Form';
     }
+  };
+
+  // Format date for display
+  const formatDate = (date) => {
+    if (!date) return 'recently';
+    const d = new Date(date);
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
   };
 
   // Set default message based on type if not provided
@@ -54,6 +70,8 @@ const Modal = ({
         return 'Are you sure you want to publish this form? Once published, it will be available for responses.';
       case 'clear':
         return 'Are you sure you want to clear all the information you’ve entered? This action cannot be undone.';
+      case 'submitted':
+        return `You last submitted this form on ${formatDate(lastSubmissionDate)}. Do you want to submit this form again?`;
       case 'delete':
       default:
         return 'Are you sure you want to delete this form? This action cannot be undone.';
@@ -67,6 +85,8 @@ const Modal = ({
         return 'confirm-btn publish';
       case 'clear':
         return 'confirm-btn clear';
+      case 'submitted':
+        return 'confirm-btn submitted';
       case 'delete':
       default:
         return 'confirm-btn delete';

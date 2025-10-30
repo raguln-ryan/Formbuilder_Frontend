@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { FiSearch, FiFilter, FiFileText } from 'react-icons/fi';
 import '../../styles/components/Learner/PublishedFormList.css';
 import searchIcon from '../../assets/Ellipse.png';
+import Modal from '../Common/Modal';
 
 const PublishedFormList = () => {
   const [activeTab, setActiveTab] = useState('published');
@@ -21,6 +22,9 @@ const PublishedFormList = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [statusFilter, setStatusFilter] = useState('External Training Completion');
+  const [showSubmittedModal, setShowSubmittedModal] = useState(false);
+  const [lastSubmissionDate, setLastSubmissionDate] = useState(null);
+  const [selectedFormId, setSelectedFormId] = useState(null);
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -86,9 +90,41 @@ const PublishedFormList = () => {
     }
   };
 
-  const handleSubmitResponse = (formId) => {
-    console.log('Navigating to form submission with ID:', formId);
-    navigate(`/form/${formId}/submission`);
+  const handleSubmitResponse = async (formId) => {
+    try {
+      // Always fetch fresh submissions to check
+      const submissions = await responseService.getMySubmissions();
+
+      // Find if form has already been submitted
+      const existingSubmission = submissions && submissions.find(
+        submission => (submission.formId === formId ||
+          submission.form_id === formId ||
+          submission.form?.id === formId ||
+          submission.form?.formId === formId)
+      );
+
+      if (existingSubmission) {
+        // Store the form ID and submission date for the modal
+        setSelectedFormId(formId);
+        setLastSubmissionDate(existingSubmission.submittedAt || existingSubmission.submitted_at);
+        setShowSubmittedModal(true);
+      } else {
+        console.log('Navigating to form submission with ID:', formId);
+        navigate(`/form/${formId}/submission`);
+      }
+    } catch (error) {
+      console.error('Error checking submissions:', error);
+      // If there's an error checking submissions, proceed to form
+      navigate(`/form/${formId}/submission`);
+    }
+  };
+
+  // Add this function to handle continuation after modal confirmation
+  const handleContinueSubmission = () => {
+    setShowSubmittedModal(false);
+    if (selectedFormId) {
+      navigate(`/form/${selectedFormId}/submission`);
+    }
   };
 
   const handleViewSubmission = (submission) => {
@@ -353,15 +389,15 @@ const PublishedFormList = () => {
                       onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                       disabled={currentPage === 1}
                     >
-                      
+
                     </button>
                     <button
-                        className={`pagination-page-btn ${currentPage !== totalPages ? 'active' : ''}`}
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                        disabled={currentPage === totalPages}
-                      >
-                          
-                      </button>
+                      className={`pagination-page-btn ${currentPage !== totalPages ? 'active' : ''}`}
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+
+                    </button>
                   </div>
                 </div>
               </>
@@ -369,6 +405,19 @@ const PublishedFormList = () => {
           </div>
         )}
       </div>
+
+      {/* Already Submitted Modal */}
+      <Modal
+        isOpen={showSubmittedModal}
+        onClose={() => {
+          setShowSubmittedModal(false);
+          setSelectedFormId(null);
+          setLastSubmissionDate(null);
+        }}
+        onConfirm={handleContinueSubmission}
+        type="submitted"
+        lastSubmissionDate={lastSubmissionDate}
+      />
     </div>
   );
 };
