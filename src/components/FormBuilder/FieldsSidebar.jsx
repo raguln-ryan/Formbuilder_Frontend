@@ -7,12 +7,12 @@ import numeric from './../../assets/numeric.png';
 import calendar from './../../assets/calendar.png';
 import dropdown from './../../assets/dropdown.png';
 
-const FieldsSidebar = ({ onFieldDragStart }) => {
+const FieldsSidebar = ({ onFieldDragStart, formId = '' }) => {
   const [activeTab, setActiveTab] = useState('input'); // 'input' or 'udf'
   
   // Input field types with background colors
   const inputFieldTypes = [
-    { type: 'short_text', label: 'Short Text', icon: shorttext, backgroundColor: '#CBE3FE' },
+    { type: 'short_text', label: 'Short Text', icon: shorttext, backgroundColor: '#CBE3FE'},
     { type: 'long_text', label: 'Long Text', icon: longtext, backgroundColor: '#7B61FF40' },
     { type: 'date_picker', label: 'Date Picker', icon: calendar, backgroundColor: '#BBE9E4' },
     { type: 'choice', label: 'Dropdown', icon: dropdown, backgroundColor: '#DBF3CC' },
@@ -40,7 +40,7 @@ const FieldsSidebar = ({ onFieldDragStart }) => {
   };
   
   return (
-    <div className="fields-sidebar">
+    <div className={`fields-sidebar ${formId ? 'disabled' : ''}`}>
       {/* Tab Headers */}
       <div className="sidebar-tabs">
         <button 
@@ -64,7 +64,7 @@ const FieldsSidebar = ({ onFieldDragStart }) => {
             key={field.type}
             className="field-type-item"
             draggable
-            onDragStart={(e) => handleDragStart(e, field)}
+            onDragStart={formId ? () => {} : (e) => handleDragStart(e, field)}
           >
             <div 
               className="field-icon-wrapper" 

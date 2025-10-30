@@ -9,7 +9,8 @@ const FormConfig = ({
   errors,
   saving,
   TITLE_CHAR_LIMIT,
-  DESCRIPTION_CHAR_LIMIT
+  DESCRIPTION_CHAR_LIMIT,
+  formId = '',
 }) => {
   const isFormValid = formData.title.trim() && formData.description.trim();
 
@@ -68,6 +69,7 @@ const FormConfig = ({
                 onChange={(e) => handleInputChange('title', e.target.value)}
                 placeholder="Enter Form Name"
                 maxLength={TITLE_CHAR_LIMIT}
+                disabled={formId}
               />
               {errors.title && <span className="error-message">{errors.title}</span>}
               <span className="char-counter">{formData.title.length}/{TITLE_CHAR_LIMIT}</span>
@@ -84,6 +86,7 @@ const FormConfig = ({
                 placeholder="Summarize the form's purpose for internal reference."
                 rows={4}
                 maxLength={DESCRIPTION_CHAR_LIMIT}
+                disabled={formId}
               />
               {errors.description && <span className="error-message">{errors.description}</span>}
               <span className="char-counter">{formData.description.length}/{DESCRIPTION_CHAR_LIMIT}</span>
@@ -99,6 +102,7 @@ const FormConfig = ({
                     type="checkbox"
                     checked={formData.isVisible || false}
                     onChange={(e) => handleVisibilityToggle(e.target.checked)}
+                    disabled={formId}
                   />
                   <span className="visibility-slider"></span>
                 </label>

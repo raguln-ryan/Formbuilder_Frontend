@@ -33,3 +33,9 @@
   overflow-y: auto; 
 }
 
+
+.disabled {
+  pointer-events: none;
+  opacity: 2.0;
+}
+

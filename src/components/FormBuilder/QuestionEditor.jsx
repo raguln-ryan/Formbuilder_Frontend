@@ -97,6 +97,9 @@ const QuestionEditor = ({
     }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', e.target.innerHTML);
+    
+    // Add dragging class to the entire question editor
+    e.target.closest('.question-editor')?.classList.add('is-dragging');
   };
 
   const handleDragOver = (e) => {
@@ -117,6 +120,10 @@ const QuestionEditor = ({
 
   const handleDragEnd = (e) => {
     e.preventDefault();
+    
+    // Remove dragging class
+    e.target.closest('.question-editor')?.classList.remove('is-dragging');
+    
     if (onDragEnd) {
       onDragEnd();
     }
@@ -133,44 +140,27 @@ const QuestionEditor = ({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
-      {/* <div className="question-header" onClick={() => setIsExpanded(!isExpanded)}>
-        <div className="question-header-left">
-          <span className="question-number">{index + 1}</span>
-          <div className="question-info">
-            <span className="question-title">
-              {localQuestion.question || 'Untitled Question'}
-            </span>
-            <span className="question-type-badge">
-              {getQuestionTypeLabel(localQuestion.type)}
-            </span>
-          </div>
-        </div>
-
-        <div className="question-header-actions">
-          <div
-            className="drag-handle"
-            title="Drag to reorder"
-            draggable="true"
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <img src={Threedot} alt="Drag" className="drag-icon" />
-          </div>
-        </div>
-      </div> */}
-
       {isExpanded && (
         <div className="question-body">
-      
           <div className="question-form">
+            {/* Three-dot drag handle */}
+            <div 
+              className="drag-handle-wrapper"
+              draggable="true"
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              title="Drag to reorder"
+              style={{ cursor: 'move' }}
+            >
+              <img src={Threedot} alt="Drag to reorder" className="three-dot" />
+            </div>
+            
             <Input
               value={localQuestion.question || ''}
               onChange={(e) => handleFieldChange('question', e.target.value)}
               placeholder="Untitled question"
               required
             />
-            
 
             {/* Question Type Display - Disabled */}
             <div className="question-type-display">
@@ -179,8 +169,8 @@ const QuestionEditor = ({
                 <div className="type-name">
                   {
                     localQuestion.type === 'date_picker' ?
-                    localQuestion.date_format :
-                    getQuestionTypeDescription(localQuestion.type)
+                      localQuestion.date_format :
+                      getQuestionTypeDescription(localQuestion.type)
                   }
                 </div>
               </div>
@@ -188,14 +178,6 @@ const QuestionEditor = ({
 
             {localQuestion.type === 'date_picker' && (
               <div className="date-wrap">
-                {/* <div className="date-input-wrapper">
-                  <input 
-                    className="preview-input" 
-                    placeholder={localQuestion.date_format || "DD/MM/YYYY"} 
-                    value=""
-                    disabled 
-                  />
-                </div> */}
                 {/* Date Format Radio Buttons */}
                 <div className="date-format-group">
                   <span className="format-label">Date Format:</span>
@@ -223,7 +205,6 @@ const QuestionEditor = ({
               </div>
             )}
 
-
             {/* Selection Type for Dropdown */}
             {isDropdown && (
               <div className="form-row">
@@ -234,10 +215,15 @@ const QuestionEditor = ({
                       type="radio"
                       name={`selection-type-${index}`}
                       value="single"
-                      checked={!localQuestion.multiple_choice}
+                      checked={localQuestion.multiple_choice !== true}
                       onChange={() => {
-                        handleFieldChange('single_choice', true);
-                        handleFieldChange('multiple_choice', false);
+                        const updated = {
+                          ...localQuestion,
+                          single_choice: true,
+                          multiple_choice: false
+                        };
+                        setLocalQuestion(updated);
+                        onUpdate(updated); // Update parent with both fields at once
                       }}
                     />
                     <span>Single Select</span>
@@ -249,8 +235,13 @@ const QuestionEditor = ({
                       value="multiple"
                       checked={localQuestion.multiple_choice === true}
                       onChange={() => {
-                        handleFieldChange('single_choice', false);
-                        handleFieldChange('multiple_choice', true);
+                        const updated = {
+                          ...localQuestion,
+                          single_choice: false,
+                          multiple_choice: true
+                        };
+                        setLocalQuestion(updated);
+                        onUpdate(updated); // Update parent with both fields at once
                       }}
                     />
                     <span>Multi Select</span>

@@ -9,7 +9,8 @@ const FormBuilderCanvas = ({
   questions,
   onQuestionsChange,
   formTitle,
-  formDescription
+  formDescription,
+  formId = ''
 }) => {
   const [draggedOver, setDraggedOver] = useState(false);
 
@@ -125,7 +126,7 @@ const FormBuilderCanvas = ({
   };
 
   return (
-    <div className="form-builder-canvas">
+    <div className={`form-builder-canvas ${formId ? 'disabled' : ''}`}>
       {/* Header Section */}
       <div className="form-header-section">
         <div className="form-header-label">Header</div>

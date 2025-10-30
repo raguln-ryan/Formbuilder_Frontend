@@ -3,7 +3,7 @@ import FieldsSidebar from './FieldsSidebar';
 import FormBuilderCanvas from './FormBuilderCanvas';
 import '../../styles/components/FormBuilder/SectionEditor.css';
 
-const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescription }) => {
+const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescription, formId = '' }) => {
   // When updating question text in SectionEditor
   const handleQuestionTextChange = (questionId, newText) => {
     console.log('SectionEditor: Updating question text:', {
@@ -28,9 +28,9 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
   };
 
   return (
-    <div className="section-editor">
+    <div className={`section-editor`}>
       <div className="section-editor-left">
-        <FieldsSidebar />
+        <FieldsSidebar formId={formId}/>
       </div>
       <div className="section-editor-right">
         <FormBuilderCanvas
@@ -38,6 +38,7 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
           onQuestionsChange={onQuestionsChange}
           formTitle={formTitle}
           formDescription={formDescription}
+          formId={formId}
         />
       </div>
     </div>

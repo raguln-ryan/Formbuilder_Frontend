@@ -134,8 +134,8 @@ const PublishedFormList = () => {
   };
 
   const formatDueDate = (date) => {
-    if (!date) return 'No due date';
-    const dueDate = new Date(date);
+    if (!date) return '';
+    // const dueDate = new Date(date);
     const today = new Date();
     const diffTime = dueDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -260,9 +260,13 @@ const PublishedFormList = () => {
                           </p>
                           <div className="published-form-meta">
                             {formatDueDate(form.dueDate)}
-                            {form.questions && (
-                              <span className="questions-count">
-                                {form.questions.length} questions
+                            {(form.created_at || form.createdAt || form.CreatedAt) && (
+                              <span className="created-date">
+                                Created: {new Date(form.created_at || form.createdAt || form.CreatedAt).toLocaleDateString('en-US', {
+                                  month: '2-digit',
+                                  day: '2-digit',
+                                  year: 'numeric'
+                                })}
                               </span>
                             )}
                           </div>

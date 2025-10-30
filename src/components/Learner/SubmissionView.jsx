@@ -16,6 +16,7 @@
     const [formDetails, setFormDetails] = useState(null);
     const [loading, setLoading] = useState(true);
     const [responseDetails, setResponseDetails] = useState(null);
+    const [downloadingFile, setDownloadingFile] = useState(null);
 
     useEffect(() => {
       if (!isAuthenticated || user?.role !== 'Learner') {
@@ -121,6 +122,44 @@
       });
     };
 
+    const handleDownloadFile = async (questionId, fileName) => {
+      try {
+        setDownloadingFile(questionId);
+        
+        // Get the response ID
+        const responseId = submission.id || submission.responseId || submissionId;
+        
+        // Call the download API
+        const response = await responseService.downloadFile(responseId, questionId);
+        
+        // Create a blob from the response
+        const blob = new Blob([response], { 
+          type: response.type || 'application/octet-stream' 
+        });
+        
+        // Create a temporary URL for the blob
+        const url = window.URL.createObjectURL(blob);
+        
+        // Create a temporary anchor element and trigger download
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName || 'download';
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast.success('File downloaded successfully');
+      } catch (error) {
+        console.error('Error downloading file:', error);
+        toast.error('Failed to download file');
+      } finally {
+        setDownloadingFile(null);
+      }
+    };
+
     const getAnswerValue = (question) => {
       console.log(`\n🔍 Looking for answer for question: "${question.text}"`);
       console.log('Question ID:', question.id);
@@ -146,7 +185,8 @@
               console.log('📁 Found file upload:', fileMatch[1]);
               return {
                 isFile: true,
-                fileName: fileMatch[1]
+                fileName: fileMatch[1],
+                questionId: question.id
               };
             }
           }
@@ -171,7 +211,8 @@
                 isFile: true,
                 fileName: fileUpload.fileName,
                 fileType: fileUpload.fileType,
-                fileSize: fileUpload.fileSize
+                fileSize: fileUpload.fileSize,
+                questionId: question.id
               };
             }
           }
@@ -199,23 +240,92 @@
       // Check if it's a file result
       if (result && typeof result === 'object' && result.isFile) {
         if (result.fileName) {
+          const isDownloading = downloadingFile === question.id;
+        
           return (
             <div className="file-upload-display">
               <div style={{
                 background: '#f3f4f6',
                 border: '1px solid #d1d5db',
-                padding: '8px 12px',
-                borderRadius: '4px',
-                display: 'inline-flex',
+                padding: '12px 16px',
+                borderRadius: '6px',
+                display: 'flex',
                 alignItems: 'center',
-                gap: '8px'
+                justifyContent: 'space-between',
+                gap: '12px'
               }}>
-                📎 {result.fileName}
-                {result.fileSize && (
-                  <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
-                    ({(result.fileSize / 1024).toFixed(2)} KB)
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flex: 1
+                }}>
+                  <span style={{ fontSize: '18px' }}>📎</span>
+                  <span style={{ 
+                    color: '#374151',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  }}>
+                    {result.fileName}
                   </span>
-                )}
+                  {result.fileSize && (
+                    <span style={{ 
+                      fontSize: '12px', 
+                      color: '#6b7280',
+                      marginLeft: '4px'
+                    }}>
+                      ({(result.fileSize / 1024).toFixed(2)} KB)
+                    </span>
+                  )}
+                </div>
+                
+                <button
+                  onClick={() => handleDownloadFile(question.id, result.fileName)}
+                  disabled={isDownloading}
+                  style={{
+                    background: isDownloading ? '#e5e7eb' : '#3b82f6',
+                    color: isDownloading ? '#9ca3af' : 'white',
+                    border: 'none',
+                    padding: '6px 12px',
+                    borderRadius: '4px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: isDownloading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isDownloading) {
+                      e.target.style.color= '#ffffff';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isDownloading) {
+                      e.target.style.background = '#3b82f6';
+                    }
+                  }}
+                >
+                  {isDownloading ? (
+                    <>
+                      <span style={{
+                        display: 'inline-block',
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid #9ca3af',
+                        borderTopColor: 'transparent',
+                        borderRadius: '50%',
+                        animation: 'spin 0.6s linear infinite'
+                      }}></span>
+                      Downloading...
+                    </>
+                  ) : (
+                    <>
+                       Download
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           );
@@ -332,6 +442,13 @@
             )}
           </div>
         </div>
+        
+        {/* Add spinning animation keyframe */}
+        <style jsx>{`
+          @keyframes spin {
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
       </>
     );
   };

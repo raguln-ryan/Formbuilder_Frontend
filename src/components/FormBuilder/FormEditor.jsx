@@ -221,10 +221,10 @@ const FormEditor = ({ formId }) => {
 
       localStorage.setItem('saved_forms', JSON.stringify(savedForms));
 
-      // FIX: Map 'question' field to 'text' for backend
+      // FIX: Map the fields correctly
       const questionsForBackend = questions.map(q => ({
         id: q._id || q.questionId || q.id,
-        text: q.question || q.questionText || '',  // Map 'question' to 'text'
+        text: q.question || q.questionText || '',
         type: q.type,
         options: q.options?.map(opt => opt.value || opt) || [],
         required: q.required || false,
@@ -232,12 +232,13 @@ const FormEditor = ({ formId }) => {
         maxLength: q.maxLength || null,
         enabled: q.enabled !== false,
         descriptionEnabled: q.description_enabled || q.descriptionEnabled || false,
-        singleChoice: q.singleChoice || false,
-        multipleChoice: q.multipleChoice || false,
+        singleChoice: q.single_choice || false,  // ← Fixed: using snake_case
+        multipleChoice: q.multiple_choice || false,  // ← Fixed: using snake_case
         format: q.format || null,
         order: q.order || 0
       }));
 
+      console.log('Saving questions to backend:', questionsForBackend);
       await formService.updateForm(currentFormId, { questions: questionsForBackend });
       toast.success('Form saved as draft successfully!');
     } catch (error) {
@@ -261,10 +262,10 @@ const FormEditor = ({ formId }) => {
     try {
       setSaving(true);
 
-      // FIX: Map 'question' field to 'text' for backend
+      // FIX: Map the fields correctly
       const questionsForBackend = questions.map(q => ({
         id: q._id || q.questionId || q.id,
-        text: q.question || q.questionText || '',  // Map 'question' to 'text'
+        text: q.question || q.questionText || '',
         type: q.type,
         options: q.options?.map(opt => opt.value || opt) || [],
         required: q.required || false,
@@ -272,19 +273,19 @@ const FormEditor = ({ formId }) => {
         maxLength: q.maxLength || null,
         enabled: q.enabled !== false,
         descriptionEnabled: q.description_enabled || q.descriptionEnabled || false,
-        singleChoice: q.singleChoice || false,
-        multipleChoice: q.multipleChoice || false,
+        singleChoice: q.single_choice || false,  // ← Fixed: using snake_case
+        multipleChoice: q.multiple_choice || false,  // ← Fixed: using snake_case
         format: q.format || null,
         order: q.order || 0
       }));
+
+      console.log('Publishing with questions:', questionsForBackend);
 
       // Update form with questions
       await formService.updateForm(currentFormId, { questions: questionsForBackend });
 
       // Publish the form
       await formService.publishForm(currentFormId);
-
-     
 
       navigate('/admin');
     } catch (error) {
@@ -296,6 +297,12 @@ const FormEditor = ({ formId }) => {
 
 
   const handleQuestionsChange = (updatedQuestions) => {
+    console.log('FormEditor received questions update:', updatedQuestions);
+    updatedQuestions.forEach(q => {
+      if (q.type === 'choice') {
+        console.log(`Choice question "${q.question}" - multiple_choice:`, q.multiple_choice);
+      }
+    });
     setQuestions(updatedQuestions);
   };
 

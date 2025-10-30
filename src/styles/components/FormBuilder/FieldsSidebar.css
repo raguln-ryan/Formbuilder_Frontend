@@ -122,3 +122,8 @@
   line-height: 20px;
   letter-spacing: 0px;
 }
+
+.disabled {
+  pointer-events: none;
+  opacity: 0.7;
+}

@@ -106,6 +106,25 @@ const responseService = {
       console.error('Error exporting responses:', error);
       alert('Failed to export responses');
     }
+  },
+
+  // Add this function to your existing responseService
+  downloadFile: async (responseId, questionId) => {
+    try {
+      const response = await api.get(
+        `/Response/${responseId}/file/${questionId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
+          responseType: 'blob', // Important for file download
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      throw error;
+    }
   }
 };
 

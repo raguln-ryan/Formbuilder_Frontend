@@ -292,12 +292,16 @@ const FormSubmission = () => {
       case 'choice':
       case 'dropdown':
         // Check if it's multi-select based on multiple_choice field
-        if (question.multiple_choice === true) {
+        if (question.multipleChoice === true) {
           // Render as checkboxes for multi-select
           return (
             <div className="checkbox-group">
               {question.options?.map((option, idx) => (
+        
                 <label key={idx} className="checkbox-label">
+                  <div>
+                    
+                  </div>
                   <input
                     type="checkbox"
                     value={typeof option === 'object' ? option.value : option}
@@ -545,7 +549,8 @@ const FormSubmission = () => {
           </p>
 
           {/* Form tag wraps all content including buttons */}
-          <form onSubmit={handleSubmit}>
+          {/* Form tag only wraps the questions */}
+          <form onSubmit={handleSubmit} id="submission-form">
             {form?.questions?.map((question, index) => (
               <div key={question.id} className="question-container">
                 <label className="form-label">
@@ -558,42 +563,43 @@ const FormSubmission = () => {
                 {renderQuestionInput(question, index)}
               </div>
             ))}
-
-            {/* Buttons are inside the form */}
-            <div className="form-footer">
-              <div className="form-buttons">
-                <button 
-                  type="button" 
-                  className="clear-btn"
-                  onClick={handleClearFormClick}
-                  disabled={submitting}
-                >
-                  Clear Form
-                </button>
-                
-                <div className="warning-message">
-                  <p style={{
-                    marginTop: "7px",
-                    fontSize: "14px",
-                    fontWeight: "400",
-                    color: "#202223"
-                  }}>
-                    This form cannot be saved temporarily, please submit once completed
-                  </p>
-                </div>
-                
-                <button 
-                  type="submit" 
-                  className="submit-btn"
-                  disabled={submitting}
-                >
-                  {submitting ? 'Submitting...' : 'Submit'}
-                </button>
-              </div>
-            </div>
           </form>
-        </div>
+           </div>
       </div>
+          {/* Footer is outside the form */}
+          <div className="form-footer">
+            <div className="form-buttons">
+              <button 
+                type="button" 
+                className="clear-btn"
+                onClick={handleClearFormClick}
+                disabled={submitting}
+              >
+                Clear Form
+              </button>
+              
+              <div className="warning-message">
+                <p style={{
+                  marginTop: "7px",
+                  fontSize: "14px",
+                  fontWeight: "400",
+                  color: "#202223"
+                }}>
+                  This form cannot be saved temporarily, please submit once completed
+                </p>
+              </div>
+              
+              <button 
+                type="button"
+                className="submit-btn"
+                onClick={handleSubmit}
+                disabled={submitting}
+              >
+                {submitting ? 'Submitting...' : 'Submit'}
+              </button>
+            </div>
+          </div>
+       
 
       {/* Clear Form Modal */}
       <Modal

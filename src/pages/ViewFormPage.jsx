@@ -21,6 +21,7 @@ const ViewFormPage = () => {
   const navigate = useNavigate();
 
   const location = useLocation();
+  // const { formId } = useParams();
   
   // Set initial tab based on navigation state
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'configuration');
@@ -422,6 +423,7 @@ const ViewFormPage = () => {
               saving={saving}
               TITLE_CHAR_LIMIT={TITLE_CHAR_LIMIT}
               DESCRIPTION_CHAR_LIMIT={DESCRIPTION_CHAR_LIMIT}
+              formId={formId}
             />
           )}
 
@@ -433,6 +435,7 @@ const ViewFormPage = () => {
                   onQuestionsChange={handleQuestionsChange}
                   formTitle={formData.title}
                   formDescription={formData.description}
+                  formId={formId}
                 />
 
                 <div className="form-config-actions-wrapper">
