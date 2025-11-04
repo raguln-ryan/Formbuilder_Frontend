@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import responseService from '../../services/responseService';
 import LoadingSpinner from '../Common/LoadingSpinner';
@@ -12,7 +12,8 @@ import Modal from '../Common/Modal';
 import { debounce } from 'lodash';
 import jilo from '../../assets/jilo.png';
 const PublishedFormList = () => {
-  const [activeTab, setActiveTab] = useState('published');
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'published');
   const [forms, setForms] = useState([]);
   const [mySubmissions, setMySubmissions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -45,6 +46,12 @@ const PublishedFormList = () => {
       navigate('/login');
     }
   }, [isAuthenticated, user, navigate]);
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (activeTab === 'published') {
