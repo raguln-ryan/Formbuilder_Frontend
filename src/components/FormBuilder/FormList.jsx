@@ -282,7 +282,8 @@ const FormList = () => {
   };
 
   const handleViewForm = (formId) => {
-    navigate(`/form/${formId}/view`, { state: { activeTab: 'questions' } });
+    // Change 'questions' to 'configuration' to match the actual tab name
+    navigate(`/form/${formId}/view`, { state: { activeTab: 'configuration' } });
     setActiveMenu(null);
   };
 

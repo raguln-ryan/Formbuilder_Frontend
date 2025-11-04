@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import NavigationBar from '../components/Common/NavigationBar';
 import FormConfig from '../components/FormBuilder/FormConfig';
 import SectionEditor from '../components/FormBuilder/SectionEditor';
 import QuestionPreview from '../components/FormBuilder/QuestionPreview';
-import formService from '../services/formService';
-import responseService from '../services/responseService';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
+import { 
+  fetchFormDetails, 
+  updateForm, 
+  updateFormData, 
+  updateQuestions 
+} from '../store/slices/formSlice';
+import { fetchResponses } from '../store/slices/responseSlice';
+import responseService from '../services/responseService';
 import '../styles/components/FormBuilder/FormEditor.css';
 import '../styles/pages/ViewFormPage.css';
 import character from '../assets/character.png';
@@ -19,140 +26,73 @@ const ViewFormPage = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const dispatch = useDispatch();
   
-  // Set initial tab based on navigation state
-  const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'configuration');
+  // Redux state
+  const { 
+    formData, 
+    questions, 
+    loading, 
+    saving, 
+    lastFetchedFormId 
+  } = useSelector(state => state.forms);
   
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    isVisible: true
-  });
-  const [originalFormData, setOriginalFormData] = useState(null);
-  const [questions, setQuestions] = useState([]);
-  const [responses, setResponses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { 
+    responses, 
+    totalItems, 
+    loading: responsesLoading 
+  } = useSelector(state => state.responses);
+  
+  // FIX: Check if location.state has a valid tab, otherwise default to 'configuration'
+  const initialTab = location.state?.activeTab && 
+    ['configuration', 'layout', 'responses'].includes(location.state.activeTab) 
+    ? location.state.activeTab 
+    : 'configuration';
+  
+  const [activeTab, setActiveTab] = useState(initialTab);
+  
+  // Other local states remain same...
   const [showPreview, setShowPreview] = useState(false);
   const [errors, setErrors] = useState({});
   const [responseView, setResponseView] = useState('summary');
   const [selectedResponse, setSelectedResponse] = useState(null);
-  
-  // Pagination and search states
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState('submittedAt');
   const [sortDirection, setSortDirection] = useState('desc');
-  const [responseSearchTerm, setResponseSearchTerm] = useState('');
-  const [responsePage, setResponsePage] = useState(1);
-  const [responsePageSize, setResponsePageSize] = useState(10);
-  const [responseTotalCount, setResponseTotalCount] = useState(0);
-  const [isSearching, setIsSearching] = useState(false);
-  const [totalItems, setTotalItems] = useState(0);
 
   const TITLE_CHAR_LIMIT = 100;
   const DESCRIPTION_CHAR_LIMIT = 500;
 
+  // Load form data immediately when component mounts
   useEffect(() => {
     if (formId) {
-      fetchFormDetails();
+      // Always fetch form data when formId is available
+      dispatch(fetchFormDetails(formId));
     }
-  }, [formId]);
+  }, [formId, dispatch]); // Remove lastFetchedFormId from dependencies to ensure it loads
+
+  // Debug log to see what's happening
+  useEffect(() => {
+    console.log('Active Tab:', activeTab);
+    console.log('Form Data:', formData);
+    console.log('Loading:', loading);
+  }, [activeTab, formData, loading]);
 
   // Fetch responses when responses tab is activated
   useEffect(() => {
     if (activeTab === 'responses' && formId) {
-      fetchResponses(searchTerm);
+      dispatch(fetchResponses({
+        formId,
+        page: currentPage,
+        pageSize: itemsPerPage,
+        searchTerm
+      }));
     }
-  }, [activeTab, currentPage, itemsPerPage, searchTerm]);
+  }, [activeTab, currentPage, itemsPerPage, searchTerm, formId, dispatch]);
 
-  const fetchFormDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await formService.getFormById(formId);
-      
-      if (response) {
-        const data = response.data || response;
-        
-        const configData = {
-          title: data.title || '',
-          description: data.description || '',
-          isVisible: data.isVisible !== undefined ? data.isVisible : true,
-          status: data.status || 'draft'
-        };
-        
-        setFormData(configData);
-        setOriginalFormData(configData);
-        
-        let questionsData = data.questions || [];
-        
-        if (Array.isArray(questionsData) && questionsData.length > 0) {
-          const formattedQuestions = questionsData.map((q, index) => ({
-            _id: q.id || q.questionId || q._id || `q_${Date.now()}_${index}`,
-            type: q.type || 'text',
-            question: q.text || q.question || q.questionText || '',
-            description_enabled: q.descriptionEnabled || false,
-            description: q.description || '',
-            required: q.required || false,
-            order: q.order !== undefined ? q.order : index,
-            enabled: q.enabled !== undefined ? q.enabled : true,
-            format: q.format || null,
-            maxLength: q.maxLength || null,
-            options: q.options || []
-          }));
-          
-          setQuestions(formattedQuestions);
-        } else {
-          setQuestions([]);
-        }
-        
-        // If navigated to responses tab, fetch responses
-        if (location.state?.activeTab === 'responses') {
-          fetchResponses();
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching form details:', err);
-      toast.error('Failed to load form details.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchResponses = async (search = '') => {
-    try {
-      // Pass search term to API
-      const result = await responseService.getFormResponses(formId, currentPage, itemsPerPage, search);
-      console.log('API Response:', result);
-      
-      if (result && result.data && Array.isArray(result.data)) {
-        const formattedResponses = result.data.map(response => ({
-          id: response.id,
-          submittedBy: response.user?.name || 'Anonymous',
-          userId: response.userId || '-',
-          formTitle: formData.title,
-          submittedAt: response.submittedAt,
-          email: response.user?.email || '-',
-          details: response.details || [],
-          answers: response.details || []
-        }));
-        
-        setResponses(formattedResponses);
-        // Store total count for pagination
-        setTotalItems(result.totalCount || 0);
-      } else {
-        setResponses([]);
-        setTotalItems(0);
-      }
-    } catch (err) {
-      console.error('Error fetching responses:', err);
-      setResponses([]);
-      setTotalItems(0);
-    }
-  };
-
-  // Helper function to get answer value (from SubmissionView)
+  // Helper function to get answer value
   const getAnswerValue = (question, questionIndex, responseData) => {
     if (!responseData) return '';
     
@@ -171,11 +111,10 @@ const ViewFormPage = () => {
           return fileName;
         }
         
-        // Handle option selections (they come as JSON strings like ["690784a224583c14c27a0d3c"])
+        // Handle option selections
         if (detail.answer && detail.answer.startsWith('[') && detail.answer.includes('"')) {
           try {
             const optionIds = JSON.parse(detail.answer);
-            // For now, just return the first option ID or you can map to actual option values
             return optionIds.join(', ');
           } catch (e) {
             return detail.answer;
@@ -235,12 +174,10 @@ const ViewFormPage = () => {
       }
     }
     
-    // For option-based questions (checkbox, radio, dropdown)
+    // For option-based questions
     if ((question.type === 'checkbox' || question.type === 'radio' || question.type === 'dropdown') && 
         question.options && question.options.length > 0) {
-      // If the answer contains option IDs, try to map them to actual values
       if (answerValue && answerValue.includes(',')) {
-        // Multiple selections
         const selectedIds = answerValue.split(',').map(id => id.trim());
         const selectedOptions = question.options.filter(opt => 
           selectedIds.includes(opt.id || opt.optionId || opt)
@@ -252,58 +189,13 @@ const ViewFormPage = () => {
     return answerValue || '-';
   };
 
-  // Filter and sort responses
-  const getFilteredResponses = () => {
-    let filtered = responses;
-    
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(r => 
-        r.submittedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.userId.toString().includes(searchTerm) ||
-        r.email.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    // Sort
-    filtered.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-      
-      if (sortField === 'submittedAt') {
-        aVal = new Date(aVal);
-        bVal = new Date(bVal);
-      }
-      
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
-    });
-    
-    return filtered;
-  };
-
-  // Pagination
-  const getPaginatedResponses = () => {
-    const filtered = getFilteredResponses();
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filtered.slice(startIndex, endIndex);
-  };
-
-  const totalPages = Math.ceil(getFilteredResponses().length / itemsPerPage);
-
-  const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'responses' && responses.length === 0) {
-      fetchResponses();
-    }
+  const formatSubmissionDate = (date) => {
+    if (!date) return '-';
+    return new Date(date).toLocaleString();
   };
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    dispatch(updateFormData({ [field]: value }));
     setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
@@ -318,16 +210,13 @@ const ViewFormPage = () => {
       return q;
     });
     
-    setQuestions(fixedQuestions);
+    dispatch(updateQuestions(fixedQuestions));
   };
 
   const handleSave = async () => {
     try {
-      setSaving(true);
-      
       if (!formData.title?.trim()) {
         toast.error('Form title is required');
-        setSaving(false);
         return;
       }
       
@@ -362,17 +251,29 @@ const ViewFormPage = () => {
         questions: formattedQuestions
       };
       
-      const response = await formService.updateForm(formId, updateData);
+      const resultAction = await dispatch(updateForm({ formId, updateData }));
       
-      if (response) {
+      if (updateForm.fulfilled.match(resultAction)) {
         toast.success('Form saved successfully!');
-        await fetchFormDetails();
+        dispatch(fetchFormDetails(formId));
+      } else {
+        toast.error('Failed to save form');
       }
     } catch (err) {
       console.error('Error saving form:', err);
       toast.error(`Failed to save form: ${err.message || 'Please try again.'}`);
-    } finally {
-      setSaving(false);
+    }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'responses' && responses.length === 0) {
+      dispatch(fetchResponses({
+        formId,
+        page: currentPage,
+        pageSize: itemsPerPage,
+        searchTerm
+      }));
     }
   };
 
@@ -404,23 +305,53 @@ const ViewFormPage = () => {
     }
   };
 
-  const formatSubmissionDate = (date) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleString();
+  // Filter and sort responses
+  const getFilteredResponses = () => {
+    let filtered = [...responses];
+    
+    // Search filter
+    if (searchTerm) {
+      filtered = filtered.filter(r => 
+        r.submittedBy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        r.userId?.toString().includes(searchTerm) ||
+        r.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Sort
+    filtered.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+      
+      if (sortField === 'submittedAt') {
+        aVal = new Date(aVal);
+        bVal = new Date(bVal);
+      }
+      
+      if (sortDirection === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+    
+    return filtered;
   };
 
-  const handleResponseSearch = () => {
-    setResponsePage(1);
-    fetchResponses(1, responsePageSize, responseSearchTerm);
-  };
+  // Format responses for display
+  const formattedResponses = responses.map(response => ({
+    id: response.id,
+    submittedBy: response.user?.name || response.submittedBy || 'Anonymous',
+    userId: response.userId || '-',
+    formTitle: formData.title,
+    submittedAt: response.submittedAt,
+    email: response.user?.email || response.email || '-',
+    details: response.details || [],
+    answers: response.details || []
+  }));
 
-  const handleClearSearch = () => {
-    setResponseSearchTerm('');
-    setResponsePage(1);
-    fetchResponses(1, responsePageSize, '');
-  };
-
-  if (loading) {
+  // Show loading only while actually loading
+  if (loading && !formData.title && !questions.length) {
     return (
       <div className="view-form-page">
         <NavigationBar />
@@ -460,10 +391,10 @@ const ViewFormPage = () => {
           </div>
         </div>
 
-        <div className="tab-content-wrapper">
+        <div className="tab-content-wrapper" key={activeTab}>
           {activeTab === 'configuration' && (
             <FormConfig
-              formData={formData}
+              formData={formData || { title: '', description: '', isVisible: true }}
               onInputChange={handleInputChange}
               onSaveAsDraft={handleSave}
               onNext={() => setActiveTab('layout')}
@@ -479,10 +410,10 @@ const ViewFormPage = () => {
             <div className="form-editor-content-area1">
               <div className="form-layout-wrapper">
                 <SectionEditor
-                  questions={questions}
+                  questions={questions || []}
                   onQuestionsChange={handleQuestionsChange}
-                  formTitle={formData.title}
-                  formDescription={formData.description}
+                  formTitle={formData?.title || ''}
+                  formDescription={formData?.description || ''}
                   formId={formId}
                 />
 
@@ -552,8 +483,13 @@ const ViewFormPage = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyPress={(e) => {
                               if (e.key === 'Enter') {
-                                setCurrentPage(1); // Reset to first page
-                                fetchResponses(e.target.value);
+                                setCurrentPage(1);
+                                dispatch(fetchResponses({
+                                  formId,
+                                  page: 1,
+                                  pageSize: itemsPerPage,
+                                  searchTerm: e.target.value
+                                }));
                               }
                             }}
                           />
@@ -583,11 +519,11 @@ const ViewFormPage = () => {
                         <tbody>
                           {responses.map((response) => (
                             <tr key={response.id}>
-                              <td>{response.submittedBy}</td>
-                              <td>{response.userId}</td>
-                              <td>{response.formTitle}</td>
+                              <td>{response.submittedBy || 'Anonymous'}</td>
+                              <td>{response.userId || '-'}</td>
+                              <td>{formData.title || 'Untitled Form'}</td>
                               <td>{formatSubmissionDate(response.submittedAt)}</td>
-                              <td>{response.email}</td>
+                              <td>{response.email || '-'}</td>
                               <td>
                                 <button 
                                   className="view-btn"
@@ -652,7 +588,7 @@ const ViewFormPage = () => {
                     </>
                   )
                 ) : (
-                  // Individual Response View - Using SubmissionView structure
+                  // Individual Response View
                   selectedResponse ? (
                     <div className="submission-view-wrapper">
                       <div className="submission-view-card">
@@ -724,7 +660,7 @@ const ViewFormPage = () => {
                     <div className="individual-responses-list">
                       <div className="responses-layout">
                         <div className="responses-left-panel">
-                          {responses.map((response) => (
+                          {formattedResponses.map((response) => (
                             <div
                               key={response.id}
                               className={`response-entry ${selectedResponse?.id === response.id ? 'selected' : ''}`}
@@ -744,7 +680,7 @@ const ViewFormPage = () => {
                         </div>
 
                         <div className="responses-right-panel">
-                          {responses.length === 0 ? (
+                          {formattedResponses.length === 0 ? (
                             <div className="empty-state">
                               <h3>No responses yet</h3>
                               <p>When users submit responses, they will appear here</p>
