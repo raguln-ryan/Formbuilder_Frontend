@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import responseService from '../../services/responseService';
@@ -9,22 +9,34 @@ import { FiSearch, FiFilter, FiFileText } from 'react-icons/fi';
 import '../../styles/components/Learner/PublishedFormList.css';
 import searchIcon from '../../assets/Ellipse.png';
 import Modal from '../Common/Modal';
-
+import { debounce } from 'lodash';
+import jilo from '../../assets/jilo.png';
 const PublishedFormList = () => {
   const [activeTab, setActiveTab] = useState('published');
   const [forms, setForms] = useState([]);
-  const [filteredForms, setFilteredForms] = useState([]);
   const [mySubmissions, setMySubmissions] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [submissionSearchTerm, setSubmissionSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  
+  // Pagination states for published forms
+  const [formsPage, setFormsPage] = useState(1);
+  const [formsPageSize, setFormsPageSize] = useState(10);
+  const [formsTotalCount, setFormsTotalCount] = useState(0);
+  const [formsTotalPages, setFormsTotalPages] = useState(0);
+  
+  // Pagination states for submissions
+  const [submissionsPage, setSubmissionsPage] = useState(1);
+  const [submissionsPageSize, setSubmissionsPageSize] = useState(10);
+  const [submissionsTotalCount, setSubmissionsTotalCount] = useState(0);
+  const [submissionsTotalPages, setSubmissionsTotalPages] = useState(0);
+  
   const [statusFilter, setStatusFilter] = useState('External Training Completion');
   const [showSubmittedModal, setShowSubmittedModal] = useState(false);
   const [lastSubmissionDate, setLastSubmissionDate] = useState(null);
   const [selectedFormId, setSelectedFormId] = useState(null);
+  
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -40,51 +52,97 @@ const PublishedFormList = () => {
     } else {
       fetchMySubmissions();
     }
-  }, [activeTab]);
+  }, [activeTab, formsPage, formsPageSize, submissionsPage, submissionsPageSize]);
 
-  useEffect(() => {
-    const filtered = forms.filter((form) =>
-      form.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      form.description?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredForms(filtered);
-  }, [searchTerm, forms]);
+  // Debounced search for published forms
+  const debouncedFormsSearch = useCallback(
+    debounce((searchValue) => {
+      setFormsPage(1); // Reset to first page on search
+      fetchPublishedForms(1, formsPageSize, searchValue);
+    }, 500),
+    [formsPageSize]
+  );
 
-  const fetchPublishedForms = async () => {
+  // Debounced search for submissions
+  const debouncedSubmissionsSearch = useCallback(
+    debounce((searchValue) => {
+      setSubmissionsPage(1); // Reset to first page on search
+      fetchMySubmissions(1, submissionsPageSize, searchValue);
+    }, 500),
+    [submissionsPageSize]
+  );
+
+  const handleFormsSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedFormsSearch(value);
+  };
+
+  const handleSubmissionsSearchChange = (e) => {
+    const value = e.target.value;
+    setSubmissionSearchTerm(value);
+    debouncedSubmissionsSearch(value);
+  };
+
+  const fetchPublishedForms = async (page = formsPage, size = formsPageSize, search = searchTerm) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await responseService.getPublishedForms();
+      
+      const response = await responseService.getPublishedForms(page, size, search);
+      console.log('Published forms response:', response);
 
-      if (Array.isArray(response)) {
+      if (response && response.data) {
+        setForms(response.data);
+        setFormsTotalCount(response.totalCount || 0);
+        setFormsTotalPages(response.totalPages || Math.ceil(response.totalCount / size));
+      } else if (Array.isArray(response)) {
+        // Fallback for array response
         setForms(response);
-        setFilteredForms(response);
+        setFormsTotalCount(response.length);
+        setFormsTotalPages(1);
       } else {
         setForms([]);
-        setFilteredForms([]);
+        setFormsTotalCount(0);
+        setFormsTotalPages(0);
       }
     } catch (err) {
+      console.error('Error loading forms:', err);
       toast.error('Error loading forms: ' + (err.message || ''));
       setError('Failed to load forms. Please try again.');
+      setForms([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchMySubmissions = async () => {
+  const fetchMySubmissions = async (page = submissionsPage, size = submissionsPageSize, search = submissionSearchTerm) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await responseService.getMySubmissions();
+      
+      const response = await responseService.getMySubmissions(page, size, search);
+      console.log('My submissions response:', response);
 
-      if (Array.isArray(response)) {
+      if (response && response.data) {
+        setMySubmissions(response.data);
+        setSubmissionsTotalCount(response.totalCount || 0);
+        setSubmissionsTotalPages(response.totalPages || Math.ceil(response.totalCount / size));
+      } else if (Array.isArray(response)) {
+        // Fallback for array response
         setMySubmissions(response);
+        setSubmissionsTotalCount(response.length);
+        setSubmissionsTotalPages(1);
       } else {
         setMySubmissions([]);
+        setSubmissionsTotalCount(0);
+        setSubmissionsTotalPages(0);
       }
     } catch (err) {
       console.log('No submissions yet');
       setMySubmissions([]);
+      setSubmissionsTotalCount(0);
+      setSubmissionsTotalPages(0);
     } finally {
       setLoading(false);
     }
@@ -92,11 +150,10 @@ const PublishedFormList = () => {
 
   const handleSubmitResponse = async (formId) => {
     try {
-      // Always fetch fresh submissions to check
-      const submissions = await responseService.getMySubmissions();
+      const submissions = await responseService.getMySubmissions(1, 100, '');
+      const submissionsList = submissions.data || submissions || [];
 
-      // Find if form has already been submitted
-      const existingSubmission = submissions && submissions.find(
+      const existingSubmission = submissionsList.find(
         submission => (submission.formId === formId ||
           submission.form_id === formId ||
           submission.form?.id === formId ||
@@ -104,7 +161,6 @@ const PublishedFormList = () => {
       );
 
       if (existingSubmission) {
-        // Store the form ID and submission date for the modal
         setSelectedFormId(formId);
         setLastSubmissionDate(existingSubmission.submittedAt || existingSubmission.submitted_at);
         setShowSubmittedModal(true);
@@ -114,12 +170,10 @@ const PublishedFormList = () => {
       }
     } catch (error) {
       console.error('Error checking submissions:', error);
-      // If there's an error checking submissions, proceed to form
       navigate(`/form/${formId}/submission`);
     }
   };
 
-  // Add this function to handle continuation after modal confirmation
   const handleContinueSubmission = () => {
     setShowSubmittedModal(false);
     if (selectedFormId) {
@@ -135,7 +189,7 @@ const PublishedFormList = () => {
 
   const formatDueDate = (date) => {
     if (!date) return '';
-    // const dueDate = new Date(date);
+    const dueDate = new Date(date);
     const today = new Date();
     const diffTime = dueDate - today;
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -177,17 +231,6 @@ const PublishedFormList = () => {
     return 'submitted';
   };
 
-  // Filter submissions based on search
-  const filteredSubmissions = mySubmissions.filter((submission) =>
-    submission.formTitle?.toLowerCase().includes(submissionSearchTerm.toLowerCase())
-  );
-
-  // Pagination
-  const totalPages = Math.ceil(filteredSubmissions.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedSubmissions = filteredSubmissions.slice(startIndex, endIndex);
-
   if (loading) return <LoadingSpinner />;
 
   return (
@@ -201,7 +244,7 @@ const PublishedFormList = () => {
               className={`learner-tab ${activeTab === 'published' ? 'active' : ''}`}
               onClick={() => setActiveTab('published')}
             >
-              Published Forms
+              Self-Service Forms
               {activeTab === 'published' && <div className="tab-indicator"></div>}
             </button>
             <button
@@ -217,73 +260,131 @@ const PublishedFormList = () => {
 
       <div className="published-form-list-container">
         {activeTab === 'published' ? (
-          // Published Forms Tab Content (unchanged)
+          // Published Forms Tab
           error ? (
             <div className="error-state">
               <h3>Error</h3>
               <p>{error}</p>
-              <button onClick={fetchPublishedForms} className="retry-btn">
+              <button onClick={() => fetchPublishedForms()} className="retry-btn">
                 Retry
               </button>
             </div>
           ) : (
             <>
               <div className="published-form-list-header">
-                <h2>Available Forms</h2>
+                <div className = "text-container">
+                  <div className="jilo-icon-container"> 
+                    <img src={jilo} alt="Jilo" className="jilo-icon" />
+                  </div>
+                  <p>These forms are optional and can be submitted multiple times if needed.</p>
+                </div>
                 <div className="search-bar">
                   <img src={searchIcon} alt="Search" className="search-icon" />
                   <input
                     type="text"
-                    placeholder="Search forms..."
+                    placeholder="Search"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={handleFormsSearchChange}
                     className="form-search-input"
                   />
+                 
                 </div>
               </div>
 
-              {filteredForms.length === 0 ? (
+              
+
+              {forms.length === 0 ? (
                 <div className="empty-state">
                   <div className="empty-state-icon">📋</div>
                   <h3>No forms available</h3>
                   <p>{searchTerm ? 'No forms match your search' : 'No published forms available at the moment'}</p>
                 </div>
               ) : (
-                <div className="form-grid">
-                  {filteredForms.map((form) => (
-                    <div key={form.formId || form.id} className="published-form-card">
-                      <div className="published-form-card-content">
-                        <div className="published-form-details">
-                          <h3 className="published-form-title">{form.title || 'Untitled Form'}</h3>
-                          <p className="published-form-description">
-                            {form.description || 'No description available'}
-                          </p>
-                          <div className="published-form-meta">
-                            {formatDueDate(form.dueDate)}
-                            {(form.created_at || form.createdAt || form.CreatedAt) && (
-                              <span className="created-date">
-                                Created: {new Date(form.created_at || form.createdAt || form.CreatedAt).toLocaleDateString('en-US', {
-                                  month: '2-digit',
-                                  day: '2-digit',
-                                  year: 'numeric'
-                                })}
-                              </span>
-                            )}
+                <>
+                  <div className="form-grid">
+                    {forms.map((form) => (
+                      <div key={form.formId || form.id} className="published-form-card">
+                        <div className="published-form-card-content">
+                          <div className="published-form-details">
+                            <h3 className="published-form-title">{form.title || 'Untitled Form'}</h3>
+                            <p className="published-form-description">
+                              {form.description || 'No description available'}
+                            </p>
+                            <div className="published-form-meta">
+                              {formatDueDate(form.dueDate)}
+                              {form.createdAt && (
+                                <span className="created-date">
+                                  Created: {new Date(form.createdAt).toLocaleDateString('en-US', {
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    year: 'numeric'
+                                  })}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+
+                          <div className="published-form-card-footer">
+                            <button
+                              className="submit-response-btn"
+                              onClick={() => handleSubmitResponse(form.formId || form.id)}
+                            >
+                              Submit Response
+                            </button>
                           </div>
                         </div>
+                      </div>
+                    ))}
+                  </div>
 
-                        <div className="published-form-card-footer">
-                          <button
-                            className="submit-response-btn"
-                            onClick={() => handleSubmitResponse(form.formId || form.id)}
+                  {/* Pagination for Published Forms */}
+                  {formsTotalPages > 1 && (
+                    <div className="pagination-container">
+                      <div className="pagination-info">
+                        <span>
+                          Showing {((formsPage - 1) * formsPageSize) + 1} - {Math.min(formsPage * formsPageSize, formsTotalCount)} of {formsTotalCount} forms
+                        </span>
+                        <div className="items-per-page">
+                          <label>Items per page:</label>
+                          <select 
+                            value={formsPageSize} 
+                            onChange={(e) => {
+                              setFormsPageSize(Number(e.target.value));
+                              setFormsPage(1);
+                            }}
+                            className="items-per-page-select"
                           >
-                            Submit Response
-                          </button>
+                            <option value="5">5</option>
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                          </select>
                         </div>
                       </div>
+
+                      <div className="pagination-controls">
+                        <button 
+                          className="pagination-btn"
+                          onClick={() => setFormsPage(prev => Math.max(1, prev - 1))}
+                          disabled={formsPage === 1}
+                        >
+                          ←
+                        </button>
+                        <span className="page-info">
+                          Page {formsPage} of {formsTotalPages}
+                        </span>
+                        <button 
+                          className="pagination-btn"
+                          onClick={() => setFormsPage(prev => Math.min(formsTotalPages, prev + 1))}
+                          disabled={formsPage === formsTotalPages}
+                        >
+                          →
+                        </button>
+                      </div>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </>
           )
@@ -304,10 +405,11 @@ const PublishedFormList = () => {
                   <FiSearch className="submission-search-icon" />
                   <input
                     type="text"
-                    placeholder="Search"
+                    placeholder="Search submissions..."
                     value={submissionSearchTerm}
-                    onChange={(e) => setSubmissionSearchTerm(e.target.value)}
+                    onChange={handleSubmissionsSearchChange}
                   />
+                 
                 </div>
                 <button className="submission-filter-btn">
                   <FiFilter /> Filter
@@ -315,17 +417,29 @@ const PublishedFormList = () => {
               </div>
             </div>
 
-            {filteredSubmissions.length === 0 ? (
+            {submissionSearchTerm && (
+              <div className="search-info">
+                Found {submissionsTotalCount} submission{submissionsTotalCount !== 1 ? 's' : ''} for "{submissionSearchTerm}"
+              </div>
+            )}
+
+            {mySubmissions.length === 0 ? (
               <div className="empty-state">
                 <div className="empty-state-icon">📝</div>
                 <h3>No submissions yet</h3>
-                <p>You haven't submitted any forms yet. Start by submitting a form from the Published Forms tab.</p>
-                <button
-                  className="submit-now-btn"
-                  onClick={() => setActiveTab('published')}
-                >
-                  View Published Forms
-                </button>
+                <p>
+                  {submissionSearchTerm 
+                    ? `No submissions match your search "${submissionSearchTerm}"`
+                    : "You haven't submitted any forms yet. Start by submitting a form from the Published Forms tab."}
+                </p>
+                {!submissionSearchTerm && (
+                  <button
+                    className="submit-now-btn"
+                    onClick={() => setActiveTab('published')}
+                  >
+                    View Published Forms
+                  </button>
+                )}
               </div>
             ) : (
               <>
@@ -342,7 +456,7 @@ const PublishedFormList = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedSubmissions.map((submission) => (
+                      {mySubmissions.map((submission) => (
                         <tr key={submission.id}>
                           <td>{submission.formTitle || 'External Training'}</td>
                           <td>{formatSubmissionDate(submission.submittedAt)}</td>
@@ -369,41 +483,46 @@ const PublishedFormList = () => {
                   </table>
                 </div>
 
-                {/* Pagination */}
-                <div className="submission-pagination">
-                  <div className="pagination-left">
-                    <label>Items per page</label>
-                    <select
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                    >
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                    </select>
-                    <span>{startIndex + 1}–{Math.min(endIndex, filteredSubmissions.length)} of {filteredSubmissions.length} items</span>
+                {/* Pagination for Submissions */}
+                {submissionsTotalPages > 1 && (
+                  <div className="submission-pagination">
+                    <div className="pagination-left">
+                      <label>Items per page</label>
+                      <select
+                        value={submissionsPageSize}
+                        onChange={(e) => {
+                          setSubmissionsPageSize(Number(e.target.value));
+                          setSubmissionsPage(1);
+                        }}
+                      >
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                        <option value={50}>50</option>
+                      </select>
+                      <span>
+                        {((submissionsPage - 1) * submissionsPageSize) + 1}–
+                        {Math.min(submissionsPage * submissionsPageSize, submissionsTotalCount)} of {submissionsTotalCount} items
+                      </span>
+                    </div>
+                    <div className="pagination-right">
+                      <span>{submissionsPage} of {submissionsTotalPages} pages</span>
+                      <button
+                        className="pagination-page-btn"
+                        onClick={() => setSubmissionsPage(prev => Math.max(1, prev - 1))}
+                        disabled={submissionsPage === 1}
+                      >
+                        ←
+                      </button>
+                      <button
+                        className="pagination-page-btn"
+                        onClick={() => setSubmissionsPage(prev => Math.min(submissionsTotalPages, prev + 1))}
+                        disabled={submissionsPage === submissionsTotalPages}
+                      >
+                        →
+                      </button>
+                    </div>
                   </div>
-                  <div className="pagination-right">
-                    <span>{currentPage} of {totalPages} pages</span>
-                    <button
-                      className="pagination-page-btn"
-                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                    >
-
-                    </button>
-                    <button
-                      className={`pagination-page-btn ${currentPage !== totalPages ? 'active' : ''}`}
-                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                    >
-
-                    </button>
-                  </div>
-                </div>
+                )}
               </>
             )}
           </div>

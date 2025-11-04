@@ -1,21 +1,40 @@
 import api from './api';
 
 const responseService = {
-  // Get all responses for a form (Admin only)
-  getFormResponses: async (formId) => {
+  // Get all responses for a form with pagination and search (Admin only)
+  getFormResponses: async (formId, page = 1, size = 10, search = '') => {
     try {
-      const response = await api.get(`/response/form/${formId}/responses`);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString()
+      });
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const response = await api.get(`/response/form/${formId}/responses?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching form responses:', error);
-      return [];
+      return { data: [], totalCount: 0 };
     }
   },
 
-  // Get published forms (Learner)
-  getPublishedForms: async () => {
+  // Get published forms with pagination and search (Learner)
+  getPublishedForms: async (page = 1, size = 10, search = '') => {
     try {
-      const response = await api.get('/response/published');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString()
+      });
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const response = await api.get(`/response/published?${params.toString()}`);
+      console.log('Published forms:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching published forms:', error);
@@ -45,15 +64,24 @@ const responseService = {
     }
   },
 
-  // Get my submissions (Learner)
-  getMySubmissions: async () => {
+  // Get my submissions with pagination and search (Learner)
+  getMySubmissions: async (page = 1, size = 10, search = '') => {
     try {
-      const response = await api.get('/response/my-submissions');
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString()
+      });
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const response = await api.get(`/response/my-submissions?${params.toString()}`);
       console.log('My submissions from API:', response.data);
       return response.data;
     } catch (error) {
       console.error('Error fetching my submissions:', error);
-      return [];
+      return { data: [], totalCount: 0 };
     }
   },
 
@@ -71,7 +99,9 @@ const responseService = {
   // Export responses to CSV (Admin)
   exportToCSV: async (formId) => {
     try {
-      const responses = await responseService.getFormResponses(formId);
+      // Fetch all responses without pagination for export
+      const response = await responseService.getFormResponses(formId, 1, 1000, '');
+      const responses = response.data || [];
       
       if (!responses || responses.length === 0) {
         alert('No responses to export');
@@ -79,10 +109,12 @@ const responseService = {
       }
 
       // Generate CSV content
-      const headers = ['Response ID', 'User ID', 'Submitted At', 'Status'];
+      const headers = ['Response ID', 'User ID', 'User Name', 'Email', 'Submitted At', 'Status'];
       const rows = responses.map(r => [
         r.id,
         r.userId,
+        r.user?.name || 'Anonymous',
+        r.user?.email || '-',
         new Date(r.submittedAt).toLocaleString(),
         r.status || 'Completed'
       ]);
@@ -108,7 +140,7 @@ const responseService = {
     }
   },
 
-  // Add this function to your existing responseService
+  // Download file attachment
   downloadFile: async (responseId, questionId) => {
     try {
       const response = await api.get(
@@ -117,7 +149,7 @@ const responseService = {
           headers: {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
-          responseType: 'blob', // Important for file download
+          responseType: 'blob',
         }
       );
       return response.data;

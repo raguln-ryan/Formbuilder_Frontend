@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import NavigationBar from '../components/Common/NavigationBar';
 import FormConfig from '../components/FormBuilder/FormConfig';
@@ -19,9 +18,7 @@ import round from '../assets/round.png';
 const ViewFormPage = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
-
   const location = useLocation();
-  // const { formId } = useParams();
   
   // Set initial tab based on navigation state
   const [activeTab, setActiveTab] = useState(location.state?.activeTab || 'configuration');
@@ -47,6 +44,12 @@ const ViewFormPage = () => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [sortField, setSortField] = useState('submittedAt');
   const [sortDirection, setSortDirection] = useState('desc');
+  const [responseSearchTerm, setResponseSearchTerm] = useState('');
+  const [responsePage, setResponsePage] = useState(1);
+  const [responsePageSize, setResponsePageSize] = useState(10);
+  const [responseTotalCount, setResponseTotalCount] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  const [totalItems, setTotalItems] = useState(0);
 
   const TITLE_CHAR_LIMIT = 100;
   const DESCRIPTION_CHAR_LIMIT = 500;
@@ -59,10 +62,10 @@ const ViewFormPage = () => {
 
   // Fetch responses when responses tab is activated
   useEffect(() => {
-    if (activeTab === 'responses' && responses.length === 0) {
-      fetchResponses();
+    if (activeTab === 'responses' && formId) {
+      fetchResponses(searchTerm);
     }
-  }, [activeTab]);
+  }, [activeTab, currentPage, itemsPerPage, searchTerm]);
 
   const fetchFormDetails = async () => {
     try {
@@ -117,26 +120,35 @@ const ViewFormPage = () => {
     }
   };
 
-  const fetchResponses = async () => {
+  const fetchResponses = async (search = '') => {
     try {
-      const data = await responseService.getFormResponses(formId);
+      // Pass search term to API
+      const result = await responseService.getFormResponses(formId, currentPage, itemsPerPage, search);
+      console.log('API Response:', result);
       
-      // Format responses to match table structure
-      const formattedResponses = (data || []).map(response => ({
-        id: response.id,
-        submittedBy: response.user?.name || 'Anonymous',
-        userId: response.userId || '-',
-        formTitle: formData.title,
-        submittedAt: response.submittedAt,
-        email: response.user?.email || '-',
-        details: response.details || [],
-        answers: response.answers || response.details || []
-      }));
-      
-      setResponses(formattedResponses);
+      if (result && result.data && Array.isArray(result.data)) {
+        const formattedResponses = result.data.map(response => ({
+          id: response.id,
+          submittedBy: response.user?.name || 'Anonymous',
+          userId: response.userId || '-',
+          formTitle: formData.title,
+          submittedAt: response.submittedAt,
+          email: response.user?.email || '-',
+          details: response.details || [],
+          answers: response.details || []
+        }));
+        
+        setResponses(formattedResponses);
+        // Store total count for pagination
+        setTotalItems(result.totalCount || 0);
+      } else {
+        setResponses([]);
+        setTotalItems(0);
+      }
     } catch (err) {
       console.error('Error fetching responses:', err);
       setResponses([]);
+      setTotalItems(0);
     }
   };
 
@@ -144,34 +156,45 @@ const ViewFormPage = () => {
   const getAnswerValue = (question, questionIndex, responseData) => {
     if (!responseData) return '';
     
-    // Check for answers array
+    // Check details array (this is what the API returns)
+    if (responseData.details && Array.isArray(responseData.details)) {
+      const detail = responseData.details.find(d => 
+        String(d.questionId) === String(question._id) || 
+        String(d.questionId) === String(question.id) ||
+        String(d.questionId) === String(question.questionId)
+      );
+      
+      if (detail) {
+        // Handle file uploads
+        if (detail.answer && detail.answer.includes('[FILE_UPLOADED:')) {
+          const fileName = detail.answer.replace('[FILE_UPLOADED:', '').replace(']', '');
+          return fileName;
+        }
+        
+        // Handle option selections (they come as JSON strings like ["690784a224583c14c27a0d3c"])
+        if (detail.answer && detail.answer.startsWith('[') && detail.answer.includes('"')) {
+          try {
+            const optionIds = JSON.parse(detail.answer);
+            // For now, just return the first option ID or you can map to actual option values
+            return optionIds.join(', ');
+          } catch (e) {
+            return detail.answer;
+          }
+        }
+        
+        return detail.answer || '';
+      }
+    }
+    
+    // Fallback to answers array if it exists
     if (responseData.answers && Array.isArray(responseData.answers)) {
-      // Try to find by questionId
       const answer = responseData.answers.find(a => {
         return String(a.questionId) === String(question._id) || 
                String(a.questionId) === String(question.id);
       });
       
       if (answer) {
-        return answer.answer || answer.value || answer.response || answer.text || '';
-      }
-      
-      // Try by index
-      if (responseData.answers[questionIndex]) {
-        const answerByIndex = responseData.answers[questionIndex];
-        return answerByIndex.answer || answerByIndex.value || answerByIndex.response || answerByIndex;
-      }
-    }
-    
-    // Check details array (fallback)
-    if (responseData.details && Array.isArray(responseData.details)) {
-      const detail = responseData.details.find(d => 
-        String(d.questionId) === String(question._id) || 
-        String(d.questionId) === String(question.id)
-      );
-      
-      if (detail) {
-        return detail.answer || detail.value || '';
+        return answer.answer || answer.value || '';
       }
     }
     
@@ -189,16 +212,16 @@ const ViewFormPage = () => {
     });
   };
 
-  // Render answer based on question type (from SubmissionView)
+  // Render answer based on question type
   const renderAnswer = (question, questionIndex, responseData) => {
     const answerValue = getAnswerValue(question, questionIndex, responseData);
     
     // For file upload questions
     if (question.type === 'file_upload' || question.type === 'file') {
-      if (answerValue && answerValue.includes('.')) {
+      if (answerValue && answerValue !== '') {
         return (
           <button className="upload-link">
-            View Uploaded File: {answerValue}
+            📎 {answerValue}
           </button>
         );
       }
@@ -209,6 +232,20 @@ const ViewFormPage = () => {
     if (question.type === 'date' || question.type === 'date_picker') {
       if (answerValue && answerValue !== '-') {
         return formatDate(answerValue);
+      }
+    }
+    
+    // For option-based questions (checkbox, radio, dropdown)
+    if ((question.type === 'checkbox' || question.type === 'radio' || question.type === 'dropdown') && 
+        question.options && question.options.length > 0) {
+      // If the answer contains option IDs, try to map them to actual values
+      if (answerValue && answerValue.includes(',')) {
+        // Multiple selections
+        const selectedIds = answerValue.split(',').map(id => id.trim());
+        const selectedOptions = question.options.filter(opt => 
+          selectedIds.includes(opt.id || opt.optionId || opt)
+        );
+        return selectedOptions.map(opt => opt.value || opt).join(', ') || answerValue;
       }
     }
     
@@ -372,6 +409,17 @@ const ViewFormPage = () => {
     return new Date(date).toLocaleString();
   };
 
+  const handleResponseSearch = () => {
+    setResponsePage(1);
+    fetchResponses(1, responsePageSize, responseSearchTerm);
+  };
+
+  const handleClearSearch = () => {
+    setResponseSearchTerm('');
+    setResponsePage(1);
+    fetchResponses(1, responsePageSize, '');
+  };
+
   if (loading) {
     return (
       <div className="view-form-page">
@@ -502,6 +550,12 @@ const ViewFormPage = () => {
                             className="search-input"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter') {
+                                setCurrentPage(1); // Reset to first page
+                                fetchResponses(e.target.value);
+                              }
+                            }}
                           />
                         </div>
                         <button className="export-btn" onClick={handleExportToExcel}>
@@ -527,12 +581,11 @@ const ViewFormPage = () => {
                           </tr>
                         </thead>
                         <tbody>
-                          {getPaginatedResponses().map((response) => (
+                          {responses.map((response) => (
                             <tr key={response.id}>
                               <td>{response.submittedBy}</td>
                               <td>{response.userId}</td>
                               <td>{response.formTitle}</td>
-
                               <td>{formatSubmissionDate(response.submittedAt)}</td>
                               <td>{response.email}</td>
                               <td>
@@ -564,8 +617,9 @@ const ViewFormPage = () => {
                             <option value={50}>50</option>
                           </select>
                           <span>
-                            {((currentPage - 1) * itemsPerPage) + 1}–
-                            {Math.min(currentPage * itemsPerPage, getFilteredResponses().length)} of {getFilteredResponses().length} items
+                            {totalItems > 0 
+                              ? `${((currentPage - 1) * itemsPerPage) + 1}–${Math.min(currentPage * itemsPerPage, totalItems)} of ${totalItems} items`
+                              : '0 items'}
                           </span>
                         </div>
                         <div className="footer-right">
@@ -574,11 +628,11 @@ const ViewFormPage = () => {
                             value={currentPage}
                             onChange={(e) => setCurrentPage(Number(e.target.value))}
                           >
-                            {Array.from({ length: totalPages }, (_, i) => (
+                            {Array.from({ length: Math.ceil(totalItems / itemsPerPage) || 1 }, (_, i) => (
                               <option key={i + 1} value={i + 1}>{i + 1}</option>
                             ))}
                           </select>
-                          <span>of {totalPages} pages</span>
+                          <span>of {Math.ceil(totalItems / itemsPerPage) || 1} pages</span>
                           <button 
                             className="nav-btn prev"
                             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -588,8 +642,8 @@ const ViewFormPage = () => {
                           </button>
                           <button 
                             className="nav-btn next"
-                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                            disabled={currentPage === totalPages}
+                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(totalItems / itemsPerPage), prev + 1))}
+                            disabled={currentPage >= Math.ceil(totalItems / itemsPerPage)}
                           >
                             ❯
                           </button>

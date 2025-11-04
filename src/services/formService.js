@@ -2,10 +2,19 @@ import api from './api';
 import responseService from './responseService';
 
 const formService = {
-  // Get all forms
-  getAllForms: async (offset = 0, limit = 10) => {
+  // Get all forms with search support
+  getAllForms: async (page = 1, size = 10, search = '') => {
     try {
-      const response = await api.get(`/Form?offset=${offset}&limit=${limit}`);
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: size.toString()
+      });
+      
+      if (search && search.trim()) {
+        params.append('search', search.trim());
+      }
+      
+      const response = await api.get(`/Form?${params.toString()}`);
       return response.data;
     } catch (error) {
       console.error('Error fetching forms:', error);
@@ -109,9 +118,9 @@ const formService = {
   },
 
   // Add method to check if form has responses
-  getFormResponses: async (formId) => {
+  getFormResponses: async (formId, page = 1, size = 10, search = '') => {
     try {
-      return await responseService.getFormResponses(formId);
+      return await responseService.getFormResponses(formId, page, size, search);
     } catch (error) {
       console.error('Error fetching form responses:', error);
       return [];

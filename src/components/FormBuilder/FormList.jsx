@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import formService from '../../services/formService';
@@ -7,12 +7,11 @@ import LoadingSpinner from '../Common/LoadingSpinner';
 import Modal from '../Common/Modal';
 import '../../styles/components/FormBuilder/FormList.css';
 import searchIcon from '../../assets/Ellipse.png';
-import toast from 'react-hot-toast'; 
-
+import toast from 'react-hot-toast';
+import { debounce } from 'lodash'; // Install lodash if not already: npm install lodash
 
 const FormList = () => {
   const [forms, setForms] = useState([]);
-  const [filteredForms, setFilteredForms] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState({ isOpen: false, formId: null });
@@ -23,9 +22,9 @@ const FormList = () => {
   // State to track enabled/disabled status for each form
   const [formEnabledStatus, setFormEnabledStatus] = useState({});
   
-  // Pagination states
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  // Updated pagination states - using page instead of currentPage for consistency
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   
@@ -38,112 +37,130 @@ const FormList = () => {
     }
   }, [isAuthenticated, user, navigate]);
 
+  // Fetch forms when page, pageSize, or searchTerm changes
   useEffect(() => {
     fetchForms();
-  }, [currentPage, itemsPerPage]);
+  }, [page, pageSize]);
 
-  useEffect(() => {
-    // Reset to first page when search term changes
-    if (searchTerm) {
-      setCurrentPage(1);
-    }
-  }, [searchTerm]);
+  // Create a debounced search function
+  const debouncedSearch = useCallback(
+    debounce((searchValue) => {
+      setPage(1); // Reset to first page on search
+      fetchForms(1, pageSize, searchValue);
+    }, 500),
+    [pageSize]
+  );
 
-  useEffect(() => {
-    const filtered = forms.filter((form) =>
-      form.title?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredForms(filtered);
-  }, [searchTerm, forms]);
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    debouncedSearch(value);
+  };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.menu-container')) {
-        setActiveMenu(null);
-      }
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
-  const fetchForms = async () => {
+  const fetchForms = async (pageNum = page, size = pageSize, search = searchTerm) => {
     try {
       setLoading(true);
       setError(null);
       
-      // Calculate offset based on current page
-      const offset = (currentPage - 1) * itemsPerPage;
-      
-      const response = await formService.getAllForms(offset, itemsPerPage);
 
-      if (response?.data) {
-        // Handle paginated response
-        if (response.data.items && Array.isArray(response.data.items)) {
-          setForms(response.data.items);
-          setFilteredForms(response.data.items);
-          setTotalItems(response.data.totalCount || response.data.items.length);
-          setTotalPages(Math.ceil((response.data.totalCount || response.data.items.length) / itemsPerPage));
+      // Call the service with the correct parameters
+      const response = await formService.getAllForms(pageNum, size, search);
+
+      
+      console.log('Raw API Response:', response); // Debug log
+      
+      if (response) {
+
+
+
+
+        let formsData = [];
+        let total = 0;
+        
+
+        // Handle the response structure from your C# backend
+        // Backend returns: { data: [...], totalCount: 14, pageNumber: 1, pageSize: 10, totalPages: 2 }
+        if (response.data && Array.isArray(response.data)) {
+          // This is the correct structure from your backend
+          formsData = response.data;
+          total = response.totalCount || formsData.length;
           
-          // Initialize enabled status for each form
-          const initialStatus = {};
-          response.data.items.forEach(form => {
-            initialStatus[form.formId || form._id] = form.isEnabled || false;
-          });
-          setFormEnabledStatus(initialStatus);
-        } else if (Array.isArray(response.data)) {
-          setForms(response.data);
-          setFilteredForms(response.data);
-          setTotalItems(response.totalCount || response.data.length);
-          setTotalPages(Math.ceil((response.totalCount || response.data.length) / itemsPerPage));
+          // Set total pages from response or calculate it
+          if (response.totalPages !== undefined) {
+            setTotalPages(response.totalPages);
+          } else {
+            setTotalPages(Math.ceil(total / size));
+          }
           
-          // Initialize enabled status for each form
-          const initialStatus = {};
-          response.data.forEach(form => {
-            initialStatus[form.formId || form._id] = form.isEnabled || false;
-          });
-          setFormEnabledStatus(initialStatus);
+          console.log(`Loaded ${formsData.length} forms out of ${total} total`);
+        } else if (Array.isArray(response)) {
+          // Fallback if response is array directly (shouldn't happen with PaginatedResponse)
+          formsData = response;
+          total = response.length;
+          setTotalPages(Math.ceil(total / size));
         } else {
-          setForms(response.data);
-          setFilteredForms(response.data);
+          console.error('Unexpected response structure:', response);
+          formsData = [];
+          total = 0;
+          setTotalPages(0);
         }
-      } else if (Array.isArray(response)) {
-        setForms(response);
-        setFilteredForms(response);
-        setTotalItems(response.length);
-        setTotalPages(Math.ceil(response.length / itemsPerPage));
+        
+        setForms(formsData);
+        setTotalItems(total);
+
         
         // Initialize enabled status for each form
         const initialStatus = {};
-        response.forEach(form => {
-          initialStatus[form.formId || form._id] = form.isEnabled || false;
+
+
+        formsData.forEach(form => {
+          // Use the correct field name based on your backend response
+          const formId = form.formId;  // Your backend returns 'formId' field
+          if (formId) {
+            initialStatus[formId] = form.isEnabled || false;
+          }
         });
         setFormEnabledStatus(initialStatus);
+        
       } else {
+        console.log('No response received');
         setForms([]);
-        setFilteredForms([]);
         setTotalItems(0);
         setTotalPages(0);
         setFormEnabledStatus({});
       }
     } catch (err) {
-      toast.error('Error loading forms: ' + (err.response?.data?.message || ''));
+
+      console.error('Error in fetchForms:', err);
+      toast.error('Error loading forms: ' + (err.response?.data?.message || err.message || 'Unknown error'));
       setError('Failed to load forms. Please try again.');
+      setForms([]);
+      setTotalItems(0);
+      setTotalPages(0);
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePageChange = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setPage(newPage);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
-  const handleItemsPerPageChange = (e) => {
-    const newItemsPerPage = parseInt(e.target.value);
-    setItemsPerPage(newItemsPerPage);
-    setCurrentPage(1);
+  const handlePageSizeChange = (e) => {
+    const newPageSize = parseInt(e.target.value);
+    setPageSize(newPageSize);
+    setPage(1);
+  };
+
+  // Clear search
+  const handleClearSearch = () => {
+    setSearchTerm('');
+    setPage(1);
+    fetchForms(1, pageSize, '');
   };
 
   const getPageNumbers = () => {
@@ -155,13 +172,13 @@ const FormList = () => {
         pages.push(i);
       }
     } else {
-      if (currentPage <= 3) {
+      if (page <= 3) {
         for (let i = 1; i <= 4; i++) {
           pages.push(i);
         }
         pages.push('...');
         pages.push(totalPages);
-      } else if (currentPage >= totalPages - 2) {
+      } else if (page >= totalPages - 2) {
         pages.push(1);
         pages.push('...');
         for (let i = totalPages - 3; i <= totalPages; i++) {
@@ -170,7 +187,7 @@ const FormList = () => {
       } else {
         pages.push(1);
         pages.push('...');
-        for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+        for (let i = page - 1; i <= page + 1; i++) {
           pages.push(i);
         }
         pages.push('...');
@@ -182,16 +199,18 @@ const FormList = () => {
   };
 
   const handleDeleteClick = async (formId) => {
-    const form = forms.find(f => (f.formId || f._id) === formId);
+    const form = forms.find(f => f.formId === formId);
     
     let hasResponses = false;
     let responseCount = 0;
     
     if (form?.status === 1) {
       try {
-        const responses = await formService.getFormResponses(formId);
-        hasResponses = responses && responses.length > 0;
-        responseCount = responses?.length || 0;
+        // Updated to use the new API signature with pagination
+        const responses = await formService.getFormResponses(formId, 1, 100);
+        const responseData = responses.data || responses;
+        hasResponses = responseData.length > 0;
+        responseCount = responses.totalCount || responseData.length || 0;
       } catch (error) {
         console.error('Error checking responses:', error);
       }
@@ -228,17 +247,16 @@ const FormList = () => {
         toast.success(result.message || `Form deleted successfully`);
         
         const remainingItems = totalItems - 1;
-        const newTotalPages = Math.ceil(remainingItems / itemsPerPage);
+        const newTotalPages = Math.ceil(remainingItems / pageSize);
         
-        if (currentPage > newTotalPages && newTotalPages > 0) {
-          setCurrentPage(newTotalPages);
+        if (page > newTotalPages && newTotalPages > 0) {
+          setPage(newTotalPages);
         } else {
           setTimeout(() => {
             fetchForms();
           }, 500);
         }
       }
-      
     } catch (error) {
       console.error('Error in handleDelete:', error);
       const errorMessage = error.message || 'Failed to delete form';
@@ -246,11 +264,6 @@ const FormList = () => {
     } finally {
       setIsDeleting(false);
     }
-  };
-
-  const handlePublish = async (formId) => {
-    setPublishModal({ isOpen: true, formId });
-    setActiveMenu(null);
   };
 
   const toggleMenu = (formId, e) => {
@@ -273,31 +286,41 @@ const FormList = () => {
     setActiveMenu(null);
   };
 
-  // Updated handleToggleEnable function - simpler version
   const handleToggleEnable = (formId) => {
-    // Update both forms and filteredForms
     const updateFormEnabled = (formsList) => 
       formsList.map(form => 
-        (form.formId || form._id) === formId 
+        form.formId === formId 
           ? { ...form, isEnabled: !form.isEnabled } 
           : form
       );
     
     setForms(updateFormEnabled);
-    setFilteredForms(updateFormEnabled);
     
-    // Get the new status for the toast
-    const currentForm = forms.find(f => (f.formId || f._id) === formId);
+    const currentForm = forms.find(f => f.formId === formId);
     const newStatus = !currentForm?.isEnabled;
     
-    // Show visual feedback
     toast.success(`Form ${newStatus ? 'enabled' : 'disabled'}`, {
       duration: 2000,
       icon: newStatus ? '✅' : '⏸️',
     });
   };
 
-  if (loading) return <LoadingSpinner />;
+  const handlePublish = async (formId) => {
+    // Add your publish logic here
+    setActiveMenu(null);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.menu-container')) {
+        setActiveMenu(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  if (loading && !searchTerm) return <LoadingSpinner />;
 
   if (error) {
     return (
@@ -305,7 +328,7 @@ const FormList = () => {
         <div className="error-state">
           <h3>Error</h3>
           <p>{error}</p>
-          <button onClick={fetchForms} className="create-form-btn">
+          <button onClick={() => fetchForms()} className="create-form-btn">
             Retry
           </button>
         </div>
@@ -318,16 +341,17 @@ const FormList = () => {
       <div className="form-list-header">
         <h2>Form List</h2>
         <div className="form-list-actions">
-
+          {/* Updated search bar with server-side search */}
           <div className="search-bar">
             <img src={searchIcon} alt="Search" className="search-icon" />
             <input
               type="text"
-              placeholder="Search forms..."
+              placeholder="Search"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={handleSearchChange}
               className="form-search-input"
             />
+            
           </div>
 
           <button
@@ -336,16 +360,27 @@ const FormList = () => {
           >
             Create Form
           </button>
-
         </div>
       </div>
 
-      {filteredForms.length === 0 ? (
+      {loading && searchTerm ? (
+        <div className="search-loading">
+          <LoadingSpinner />
+          <p>Searching for "{searchTerm}"...</p>
+        </div>
+      ) : forms.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📝</div>
           <h3>No forms found</h3>
-          <p>{searchTerm ? 'No forms match your search' : 'Create your first form to get started'}</p>
-          {!searchTerm && (
+          <p>{searchTerm ? `No forms match your search "${searchTerm}"` : 'Create your first form to get started'}</p>
+          {searchTerm ? (
+            <button
+              className="clear-search-btn primary"
+              onClick={handleClearSearch}
+            >
+              Clear Search
+            </button>
+          ) : (
             <button
               className="create-form-btn"
               onClick={() => navigate('/form/new')}
@@ -356,54 +391,41 @@ const FormList = () => {
         </div>
       ) : (
         <>
+         
+
           <div className="form-grid">
-            {filteredForms.map((form) => (
-              <div key={form.formId || form._id} className="form-card">
+            {forms.map((form) => (
+              <div key={form.formId} className="form-card">
                 <div className="menu-container">
                   <button
                     className="menu-dots"
-                    onClick={(e) => toggleMenu(form.formId || form._id, e)}
+                    onClick={(e) => toggleMenu(form.formId, e)}
                     aria-label="More options"
                   >
                     <span></span>
                     <span></span>
                     <span></span>
                   </button>
-                  {activeMenu === (form.formId || form._id) && (
+                  {activeMenu === form.formId && (
                     <div className="dropdown-menu">
                       {form.status === 0 ? (
                         <>
-                          <button
-                            onClick={() => handleEdit(form.formId || form._id)}
-                            className="dropdown-item"
-                          >
+                          <button onClick={() => handleEdit(form.formId)} className="dropdown-item">
                             Edit
                           </button>
-                          <button
-                            onClick={() => handlePublish(form.formId || form._id)}
-                            className="dropdown-item"
-                          >
+                          <button onClick={() => handlePublish(form.formId)} className="dropdown-item">
                             Publish
                           </button>
-                          <button
-                            onClick={() => handleDeleteClick(form.formId || form._id)}
-                            className="dropdown-item delete"
-                          >
+                          <button onClick={() => handleDeleteClick(form.formId)} className="dropdown-item delete">
                             Delete
                           </button>
                         </>
                       ) : (
                         <>
-                          <button
-                            onClick={() => handleViewForm(form.formId || form._id)}
-                            className="dropdown-item"
-                          >
+                          <button onClick={() => handleViewForm(form.formId)} className="dropdown-item">
                             View Form
                           </button>
-                          <button
-                            onClick={() => handleDeleteClick(form.formId || form._id)}
-                            className="dropdown-item delete"
-                          >
+                          <button onClick={() => handleDeleteClick(form.formId)} className="dropdown-item delete">
                             Delete
                           </button>
                         </>
@@ -426,9 +448,9 @@ const FormList = () => {
                         <div className="form-detail-item">
                           <span className="form-detail-label">Created date:</span>
                           <span>
-                            {form.createdDate
-                              ? new Date(form.createdDate).toLocaleDateString()
-                              : new Date().toLocaleDateString()}
+                            {form.createdAt
+                              ? new Date(form.createdAt).toLocaleDateString()
+                              : 'N/A'}
                           </span>
                         </div>
                       </>
@@ -441,9 +463,9 @@ const FormList = () => {
                         <div className="form-detail-item">
                           <span className="form-detail-label">Published date:</span>
                           <span>
-                            {form.publishedDate
-                              ? new Date(form.publishedDate).toLocaleDateString()
-                              : new Date().toLocaleDateString()}
+                            {form.publishedAt
+                              ? new Date(form.publishedAt).toLocaleDateString()
+                              : 'N/A'}
                           </span>
                         </div>
                       </>
@@ -462,7 +484,7 @@ const FormList = () => {
                           <input
                             type="checkbox"
                             checked={form.isEnabled || false}
-                            onChange={() => handleToggleEnable(form.formId || form._id)}
+                            onChange={() => handleToggleEnable(form.formId)}
                           />
                           <span className="toggle-slider"></span>
                         </label>
@@ -473,7 +495,7 @@ const FormList = () => {
                       className={`view-responses-btn ${form.status === 0 ? 'disabled' : ''}`}
                       onClick={() => {
                         if (form.status === 1) {
-                          handleViewResponses(form.formId || form._id);
+                          handleViewResponses(form.formId);
                         }
                       }}
                       disabled={form.status === 0}
@@ -488,64 +510,7 @@ const FormList = () => {
             ))}
           </div>
 
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="pagination-container">
-              <div className="pagination-info">
-                <span>
-                  Showing {((currentPage - 1) * itemsPerPage) + 1} - {Math.min(currentPage * itemsPerPage, totalItems)} of {totalItems} forms
-                </span>
-                <div className="items-per-page">
-                  <label htmlFor="itemsPerPage">Items per page:</label>
-                  <select 
-                    id="itemsPerPage"
-                    value={itemsPerPage} 
-                    onChange={handleItemsPerPageChange}
-                    className="items-per-page-select"
-                  >
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                    <option value="50">50</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="pagination-controls">
-                <button 
-                  className="pagination-btn"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  aria-label="Previous page"
-                >
-                  ←
-                </button>
-
-                {getPageNumbers().map((page, index) => (
-                  page === '...' ? (
-                    <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
-                  ) : (
-                    <button
-                      key={page}
-                      className={`pagination-btn ${currentPage === page ? 'active' : ''}`}
-                      onClick={() => handlePageChange(page)}
-                    >
-                      {page}
-                    </button>
-                  )
-                ))}
-
-                <button 
-                  className="pagination-btn"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  aria-label="Next page"
-                >
-                  →
-                </button>
-              </div>
-            </div>
-          )}
+         
         </>
       )}
 
