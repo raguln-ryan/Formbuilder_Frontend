@@ -1,135 +1,106 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../../contexts/AuthContext';
 import FormConfig from './FormConfig';
 import FormLayout from './FormLayout';
-import formService from '../../services/formService';
 import LoadingSpinner from '../Common/LoadingSpinner';
-import '../../styles/components/FormBuilder/FormEditor.css';
+import {
+  setActiveTab,
+  setFormField,
+  setQuestions,
+  resetForm,
+  validateFormConfig,
+  setCurrentFormId,
+  setFormData,
+  setSaving,
+  setLoading
+} from '../../store/slices/formBuilderSlice';
+import formService from '../../services/formService';
 import toast from 'react-hot-toast';
+import '../../styles/components/FormBuilder/FormEditor.css';
 
 const FormEditor = ({ formId }) => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user, isAuthenticated } = useAuth();
-
-  // Authentication check
+  
+  const {
+    formData,
+    questions,
+    currentFormId,
+    activeTab,
+    loading,
+    saving,
+    errors,
+    TITLE_CHAR_LIMIT,
+    DESCRIPTION_CHAR_LIMIT
+  } = useSelector(state => state.formBuilder);
+  
+  const isEdit = formId && formId !== 'new';
+  
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'Admin') {
       navigate('/login');
     }
   }, [isAuthenticated, user, navigate]);
-
-  const isEdit = formId && formId !== 'new';
-
-  const [activeTab, setActiveTab] = useState('config');
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState({});
-
-  const [formData, setFormData] = useState({
-    title: '',
-    description: ''
-  });
-
-  const [questions, setQuestions] = useState([]);
-  const [currentFormId, setCurrentFormId] = useState(null);
-
-  // Character limits
-  const TITLE_CHAR_LIMIT = 80;
-  const DESCRIPTION_CHAR_LIMIT = 200;
-
+  
   useEffect(() => {
     if (isEdit) {
       fetchFormData();
     }
-  }, [formId]);
+    return () => {
+      dispatch(resetForm());
+    };
+  }, [formId, isEdit]);
 
+  // Fetch form data - DIRECT API CALL
   const fetchFormData = async () => {
     try {
-      setLoading(true);
+      dispatch(setLoading(true));
       const response = await formService.getFormById(formId);
       if (response) {
-        setFormData({
+        dispatch(setFormData({
           title: response.title || '',
           description: response.description || ''
-        });
-        setQuestions(response.questions || []);
-        setCurrentFormId(formId);
+        }));
+        dispatch(setQuestions(response.questions || []));
+        dispatch(setCurrentFormId(formId));
       }
     } catch (error) {
       alert('Failed to load form data');
       navigate('/admin');
     } finally {
-      setLoading(false);
+      dispatch(setLoading(false));
     }
   };
-
-  const validateFormConfig = () => {
-    const newErrors = {};
-
-    // Title validation
-    if (!formData.title.trim()) {
-      newErrors.title = 'Form name is required';
-    } else if (formData.title.trim().length < 3) {
-      newErrors.title = 'Form name must be at least 3 characters';
-    } else if (formData.title.length > TITLE_CHAR_LIMIT) {
-      newErrors.title = `Form name cannot exceed ${TITLE_CHAR_LIMIT} characters`;
-    }
-
-    // Description validation
-    if (!formData.description.trim()) {
-      newErrors.description = 'Form description is required';
-    } else if (formData.description.trim().length < 10) {
-      newErrors.description = 'Form description must be at least 10 characters';
-    } else if (formData.description.length > DESCRIPTION_CHAR_LIMIT) {
-      newErrors.description = `Form description cannot exceed ${DESCRIPTION_CHAR_LIMIT} characters`;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
+  
   const handleInputChange = (field, value) => {
-    // Apply character limits
-    if (field === 'title' && value.length > TITLE_CHAR_LIMIT) {
-      return;
-    }
-    if (field === 'description' && value.length > DESCRIPTION_CHAR_LIMIT) {
-      return;
-    }
-
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-
-    // Clear error for this field
-    if (errors[field]) {
-      setErrors(prev => ({
-        ...prev,
-        [field]: ''
-      }));
-    }
+    dispatch(setFormField({ field, value }));
   };
-
+  
+  // SAVE AS DRAFT - DIRECT API CALL (Original Logic)
   const handleSaveAsDraft = async () => {
-    if (!validateFormConfig()) return;
+    if (!formData.title.trim() || !formData.description.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
     try {
-      setSaving(true);
+      dispatch(setSaving(true));
       let savedFormId = currentFormId;
 
       if (!savedFormId) {
-        // Create new form
+        // Create new form - ACTUAL API CALL
         const response = await formService.createForm(formData);
         savedFormId = response.formId;
-        setCurrentFormId(savedFormId);
+        dispatch(setCurrentFormId(savedFormId));
       } else {
-        // Update existing form config
+        // Update existing form - ACTUAL API CALL
         await formService.updateFormConfig(savedFormId, formData);
       }
 
-      // Save to localStorage as draft
+      // Save to localStorage
       const savedForms = JSON.parse(localStorage.getItem('saved_forms') || '[]');
       const formToSave = {
         formId: savedFormId,
@@ -157,35 +128,44 @@ const FormEditor = ({ formId }) => {
 
       toast.success('Form saved as draft successfully!');
     } catch (error) {
+      console.error('Save draft error:', error);
       toast.error('Failed to save form. Please try again.');
     } finally {
-      setSaving(false);
+      dispatch(setSaving(false));
     }
   };
-
+  
+  // NEXT BUTTON - DIRECT API CALL
   const handleNext = async () => {
-    if (!validateFormConfig()) return;
+    dispatch(validateFormConfig());
+    
+    if (!formData.title.trim() || !formData.description.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
     try {
-      setSaving(true);
+      dispatch(setSaving(true));
 
       if (!currentFormId) {
-        // Create form first
+        // Create form first - ACTUAL API CALL
         const response = await formService.createForm(formData);
-        setCurrentFormId(response.formId);
+        dispatch(setCurrentFormId(response.formId));
       } else {
-        // Update form config
+        // Update form config - ACTUAL API CALL
         await formService.updateFormConfig(currentFormId, formData);
       }
 
-      setActiveTab('layout');
+      dispatch(setActiveTab('layout'));
     } catch (error) {
+      console.error('Next error:', error);
       toast.error('Failed to save form configuration.');
     } finally {
-      setSaving(false);
+      dispatch(setSaving(false));
     }
   };
-
+  
+  // SAVE LAYOUT AS DRAFT - DIRECT API CALL
   const handleSaveLayoutAsDraft = async () => {
     if (!currentFormId) {
       toast.error('Please save form configuration first');
@@ -198,7 +178,7 @@ const FormEditor = ({ formId }) => {
     }
 
     try {
-      setSaving(true);
+      dispatch(setSaving(true));
 
       // Save to localStorage
       const savedForms = JSON.parse(localStorage.getItem('saved_forms') || '[]');
@@ -221,7 +201,7 @@ const FormEditor = ({ formId }) => {
 
       localStorage.setItem('saved_forms', JSON.stringify(savedForms));
 
-      // FIX: Map the fields correctly
+      // Map questions for backend
       const questionsForBackend = questions.map(q => ({
         id: q._id || q.questionId || q.id,
         text: q.question || q.questionText || '',
@@ -232,22 +212,26 @@ const FormEditor = ({ formId }) => {
         maxLength: q.maxLength || null,
         enabled: q.enabled !== false,
         descriptionEnabled: q.description_enabled || q.descriptionEnabled || false,
-        singleChoice: q.single_choice || false,  // ← Fixed: using snake_case
-        multipleChoice: q.multiple_choice || false,  // ← Fixed: using snake_case
+        singleChoice: q.single_choice || false,
+        multipleChoice: q.multiple_choice || false,
         format: q.format || null,
         order: q.order || 0
       }));
 
       console.log('Saving questions to backend:', questionsForBackend);
+      
+      // ACTUAL API CALL
       await formService.updateForm(currentFormId, { questions: questionsForBackend });
       toast.success('Form saved as draft successfully!');
     } catch (error) {
+      console.error('Save layout draft error:', error);
       toast.error('Failed to save form as draft.');
     } finally {
-      setSaving(false);
+      dispatch(setSaving(false));
     }
   };
-
+  
+  // PUBLISH - DIRECT API CALL
   const handlePublish = async () => {
     if (!currentFormId) {
       toast.error('Please save form first');
@@ -260,9 +244,9 @@ const FormEditor = ({ formId }) => {
     }
 
     try {
-      setSaving(true);
+      dispatch(setSaving(true));
 
-      // FIX: Map the fields correctly
+      // Map questions for backend
       const questionsForBackend = questions.map(q => ({
         id: q._id || q.questionId || q.id,
         text: q.question || q.questionText || '',
@@ -273,67 +257,57 @@ const FormEditor = ({ formId }) => {
         maxLength: q.maxLength || null,
         enabled: q.enabled !== false,
         descriptionEnabled: q.description_enabled || q.descriptionEnabled || false,
-        singleChoice: q.single_choice || false,  // ← Fixed: using snake_case
-        multipleChoice: q.multiple_choice || false,  // ← Fixed: using snake_case
+        singleChoice: q.single_choice || false,
+        multipleChoice: q.multiple_choice || false,
         format: q.format || null,
         order: q.order || 0
       }));
 
       console.log('Publishing with questions:', questionsForBackend);
 
-      // Update form with questions
+      // ACTUAL API CALLS
       await formService.updateForm(currentFormId, { questions: questionsForBackend });
-
-      // Publish the form
       await formService.publishForm(currentFormId);
 
       navigate('/admin');
     } catch (error) {
+      console.error('Publish error:', error);
       toast.error('Failed to publish form. ' + (error.response?.data?.message || ''));
     } finally {
-      setSaving(false);
+      dispatch(setSaving(false));
     }
   };
-
-
+  
   const handleQuestionsChange = (updatedQuestions) => {
     console.log('FormEditor received questions update:', updatedQuestions);
-    updatedQuestions.forEach(q => {
-      if (q.type === 'choice') {
-        console.log(`Choice question "${q.question}" - multiple_choice:`, q.multiple_choice);
-      }
-    });
-    setQuestions(updatedQuestions);
+    dispatch(setQuestions(updatedQuestions));
   };
-
+  
   if (loading) {
     return <LoadingSpinner message="Loading form..." />;
   }
-
+  
   return (
     <div className="form-editor-main-container">
       <div className="form-editor-content-wrapper">
-        {/* Tabs header */}
         <div className="form-editor-tabs-header">
           <div className="tabs-container">
             <button
               className={`tab-button ${activeTab === 'config' ? 'tab-active' : ''}`}
-              onClick={() => setActiveTab('config')}
+              onClick={() => dispatch(setActiveTab('config'))}
             >
               Form Configuration
             </button>
             <button
               className={`tab-button ${activeTab === 'layout' ? 'tab-active' : ''} ${!currentFormId && !formData.title ? 'tab-disabled' : ''}`}
-              onClick={() => currentFormId || formData.title ? setActiveTab('layout') : null}
+              onClick={() => currentFormId || formData.title ? dispatch(setActiveTab('layout')) : null}
               disabled={!currentFormId && !formData.title}
             >
               Form Layout
             </button>
           </div>
         </div>
-
-        {/* Content area */}
-        {/* <div className="form-editor-content-area"> */}
+        
         {activeTab === 'config' ? (
           <FormConfig
             formData={formData}
@@ -357,7 +331,6 @@ const FormEditor = ({ formId }) => {
         )}
       </div>
     </div>
-    // </div>
   );
 };
 

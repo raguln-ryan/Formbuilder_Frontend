@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import '../../styles/components/FormBuilder/QuestionPreview.css';
 
 const QuestionPreview = ({ formTitle, formDescription, questions }) => {
-  // Initialize form values state
+  // Can optionally get form data from Redux
+  // const { formData, questions } = useSelector(state => state.formBuilder);
+  
   const [formValues, setFormValues] = useState({});
-
+  
   // Prevent background scrolling when preview is open
   useEffect(() => {
     // Add class to body to prevent background scroll

@@ -1,9 +1,13 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import FieldsSidebar from './FieldsSidebar';
 import FormBuilderCanvas from './FormBuilderCanvas';
 import '../../styles/components/FormBuilder/SectionEditor.css';
 
 const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescription, formId = '' }) => {
+  // Can optionally get questions from Redux if needed
+  // const { questions } = useSelector(state => state.formBuilder);
+  
   // When updating question text in SectionEditor
   const handleQuestionTextChange = (questionId, newText) => {
     console.log('SectionEditor: Updating question text:', {

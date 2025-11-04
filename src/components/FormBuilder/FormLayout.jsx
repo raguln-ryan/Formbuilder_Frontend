@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import SectionEditor from './SectionEditor';
 import QuestionPreview from './QuestionPreview';
 import Modal from '../Common/Modal';
+import { togglePreview, setShowPublishModal } from '../../store/slices/formBuilderSlice';
 import '../../styles/components/FormBuilder/FormEditor.css';
 
 const FormLayout = ({
@@ -12,22 +14,25 @@ const FormLayout = ({
   onPublish,
   saving
 }) => {
-  const [showPreview, setShowPreview] = useState(false);
-  const [showPublishModal, setShowPublishModal] = useState(false);
-
-  const togglePreview = () => {
-    setShowPreview(!showPreview);
+  const dispatch = useDispatch();
+  const { showPreview, showPublishModal } = useSelector(state => state.formBuilder);
+  
+  // Original toggle preview logic
+  const handleTogglePreview = () => {
+    dispatch(togglePreview());
   };
-
+  
+  // Original publish click logic
   const handlePublishClick = () => {
-    setShowPublishModal(true);
+    dispatch(setShowPublishModal(true));
   };
-
+  
+  // Original confirm publish logic
   const confirmPublish = () => {
-    setShowPublishModal(false);
-    onPublish(); // Call the actual publish function from FormEditor
+    dispatch(setShowPublishModal(false));
+    onPublish();
   };
-
+  
   return (
     <div className="form-editor-content-area1">
       <div className="form-layout-wrapper">
@@ -36,7 +41,7 @@ const FormLayout = ({
             <div className="preview-modal-content">
               <div className="preview-modal-header">
                 <h2>Form Preview</h2>
-                <button className="close-preview" onClick={togglePreview}>×</button>
+                <button className="close-preview" onClick={handleTogglePreview}>×</button>
               </div>
               <QuestionPreview
                 formTitle={formData.title}
@@ -59,7 +64,7 @@ const FormLayout = ({
           <div className="form-config-actions-wrapper">
             <button
               className="action-button action-button-secondary"
-              onClick={togglePreview}
+              onClick={handleTogglePreview}
             >
               <span style={{ marginRight: '8px' }}>👁️</span>
               Preview Form
@@ -86,7 +91,7 @@ const FormLayout = ({
         {/* Publish Confirmation Modal */}
         <Modal
           isOpen={showPublishModal}
-          onClose={() => setShowPublishModal(false)}
+          onClose={() => dispatch(setShowPublishModal(false))}
           onConfirm={confirmPublish}
           title="Publish Form"
           message="Are you sure you want to publish this form? Once published, editing will be locked after the any workflow linked to this form. This action cannot be undone"
