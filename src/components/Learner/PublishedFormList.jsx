@@ -345,52 +345,7 @@ const PublishedFormList = () => {
                     ))}
                   </div>
 
-                  {/* Pagination for Published Forms */}
-                  {formsTotalPages > 1 && (
-                    <div className="pagination-container">
-                      <div className="pagination-info">
-                        <span>
-                          Showing {((formsPage - 1) * formsPageSize) + 1} - {Math.min(formsPage * formsPageSize, formsTotalCount)} of {formsTotalCount} forms
-                        </span>
-                        <div className="items-per-page">
-                          <label>Items per page:</label>
-                          <select 
-                            value={formsPageSize} 
-                            onChange={(e) => {
-                              setFormsPageSize(Number(e.target.value));
-                              setFormsPage(1);
-                            }}
-                            className="items-per-page-select"
-                          >
-                            <option value="5">5</option>
-                            <option value="10">10</option>
-                            <option value="20">20</option>
-                            <option value="50">50</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="pagination-controls">
-                        <button 
-                          className="pagination-btn"
-                          onClick={() => setFormsPage(prev => Math.max(1, prev - 1))}
-                          disabled={formsPage === 1}
-                        >
-                          ←
-                        </button>
-                        <span className="page-info">
-                          Page {formsPage} of {formsTotalPages}
-                        </span>
-                        <button 
-                          className="pagination-btn"
-                          onClick={() => setFormsPage(prev => Math.min(formsTotalPages, prev + 1))}
-                          disabled={formsPage === formsTotalPages}
-                        >
-                          →
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                 
                 </>
               )}
             </>
@@ -424,11 +379,7 @@ const PublishedFormList = () => {
               </div>
             </div>
 
-            {submissionSearchTerm && (
-              <div className="search-info">
-                Found {submissionsTotalCount} submission{submissionsTotalCount !== 1 ? 's' : ''} for "{submissionSearchTerm}"
-              </div>
-            )}
+           
 
             {mySubmissions.length === 0 ? (
               <div className="empty-state">

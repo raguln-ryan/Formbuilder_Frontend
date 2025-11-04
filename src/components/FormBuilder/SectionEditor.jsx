@@ -1,35 +1,19 @@
 import React from 'react';
-import { useSelector } from 'react-redux';
 import FieldsSidebar from './FieldsSidebar';
 import FormBuilderCanvas from './FormBuilderCanvas';
 import '../../styles/components/FormBuilder/SectionEditor.css';
 
-const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescription, formId = '' }) => {
-  // Can optionally get questions from Redux if needed
-  // const { questions } = useSelector(state => state.formBuilder);
+const SectionEditor = (props) => {
+  console.log('SECTION EDITOR PROPS:', props);
   
-  // When updating question text in SectionEditor
-  const handleQuestionTextChange = (questionId, newText) => {
-    console.log('SectionEditor: Updating question text:', {
-      questionId,
-      newText
-    });
-    
-    const updatedQuestions = questions.map(q => {
-      if (q._id === questionId || q.questionId === questionId) {
-        // Make sure to set the 'question' field
-        return {
-          ...q,
-          question: newText,  // ← THIS IS CRITICAL
-          questionText: newText  // Also set this for compatibility
-        };
-      }
-      return q;
-    });
-    
-    console.log('SectionEditor: Updated questions:', updatedQuestions);
-    onQuestionsChange(updatedQuestions);
-  };
+  // Don't destructure, pass props directly
+  const { questions, onQuestionsChange, formTitle, formDescription, formId = '' } = props;
+  
+  console.log('SECTION EDITOR RECEIVED:', {
+    questions: questions,
+    questionsLength: questions?.length,
+    formTitle: formTitle
+  });
 
   return (
     <div className={`section-editor`}>
@@ -37,8 +21,10 @@ const SectionEditor = ({ questions, onQuestionsChange, formTitle, formDescriptio
         <FieldsSidebar formId={formId}/>
       </div>
       <div className="section-editor-right">
+        {console.log('PASSING TO CANVAS - RIGHT BEFORE:', questions)}
         <FormBuilderCanvas
-          questions={questions}
+          questionsList={questions}  // Use different prop name
+          questions={questions}       // Keep original too
           onQuestionsChange={onQuestionsChange}
           formTitle={formTitle}
           formDescription={formDescription}

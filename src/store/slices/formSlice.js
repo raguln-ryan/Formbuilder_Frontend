@@ -61,6 +61,8 @@ const formSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchFormDetails.fulfilled, (state, action) => {
+        console.log('Raw API Response:', action.payload); // Debug log
+        
         state.loading = false;
         state.currentForm = action.payload;
         
@@ -72,26 +74,35 @@ const formSlice = createSlice({
           status: action.payload.status || 'draft'
         };
         
-        // Format questions
+        // Format questions - with detailed logging
         let questionsData = action.payload.questions || [];
+        console.log('Questions from API:', questionsData); // Debug log
+        
         if (Array.isArray(questionsData) && questionsData.length > 0) {
-          state.questions = questionsData.map((q, index) => ({
-            _id: q.id || q.questionId || q._id || `q_${Date.now()}_${index}`,
-            type: q.type || 'text',
-            question: q.text || q.question || q.questionText || '',
-            description_enabled: q.descriptionEnabled || false,
-            description: q.description || '',
-            required: q.required || false,
-            order: q.order !== undefined ? q.order : index,
-            enabled: q.enabled !== undefined ? q.enabled : true,
-            format: q.format || null,
-            maxLength: q.maxLength || null,
-            options: q.options || []
-          }));
+          state.questions = questionsData.map((q, index) => {
+            const formattedQuestion = {
+              _id: q.id || q.questionId || q._id || `q_${Date.now()}_${index}`,
+              type: q.type || 'short_text',
+              question: q.text || q.question || q.questionText || '',
+              description_enabled: q.descriptionEnabled || false,
+              description: q.description || '',
+              required: q.required || false,
+              order: q.order !== undefined ? q.order : index,
+              enabled: q.enabled !== undefined ? q.enabled : true,
+              format: q.format || null,
+              maxLength: q.maxLength || null,
+              options: q.options || [],
+              single_choice: q.singleChoice || false,
+              multiple_choice: q.multipleChoice || false
+            };
+            console.log('Formatted question:', formattedQuestion); // Debug log
+            return formattedQuestion;
+          });
         } else {
           state.questions = [];
         }
         
+        console.log('Final state.questions:', state.questions); // Debug log
         state.lastFetchedFormId = action.meta.arg;
       })
       .addCase(fetchFormDetails.rejected, (state, action) => {

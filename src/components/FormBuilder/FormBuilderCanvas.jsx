@@ -1,43 +1,42 @@
 import React, { useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
 import QuestionEditor from './QuestionEditor';
 import { generateId } from '../../utils/helpers';
-import {
-  addQuestion,
-  updateQuestion,
-  deleteQuestion,
-  duplicateQuestion,
-  reorderQuestions,
-  setDraggedOver,
-  setDraggedQuestionIndex,
-  setDragOverIndex
-} from '../../store/slices/formBuilderSlice';
 import Drag from './../../assets/drag.png';
 import toast from 'react-hot-toast';
 import '../../styles/components/FormBuilder/FormBuilderCanvas.css';
 
-const FormBuilderCanvas = ({ formTitle, formDescription, formId = '' }) => {
-  const dispatch = useDispatch();
-  const {
-    questions,
-    draggedOver,
-    draggedQuestionIndex,
-    dragOverIndex
-  } = useSelector(state => state.formBuilder);
-  
+const FormBuilderCanvas = ({
+  questions,
+  onQuestionsChange,
+  formTitle,
+  formDescription,
+  formId = ''
+}) => {
+  // Add ALL missing state variables
+  const [draggedOver, setDraggedOver] = useState(false);
+  const [draggedQuestionIndex, setDraggedQuestionIndex] = useState(null);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+
+  // Add debug logging
+  console.log('FormBuilderCanvas received:', {
+    questions: questions,
+    formId: formId,
+    questionsLength: questions?.length
+  });
+
   const handleDragOver = (e) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
-    dispatch(setDraggedOver(true));
+    setDraggedOver(true);
   };
 
   const handleDragLeave = () => {
-    dispatch(setDraggedOver(false));
+    setDraggedOver(false);
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    dispatch(setDraggedOver(false));
+    setDraggedOver(false);
 
     try {
       const fieldType = JSON.parse(e.dataTransfer.getData('fieldType'));
@@ -63,7 +62,7 @@ const FormBuilderCanvas = ({ formTitle, formDescription, formId = '' }) => {
         enabled: true
       };
 
-      dispatch(addQuestion(newQuestion));
+      onQuestionsChange([...questions, newQuestion]);
       toast.success(`${fieldType.label} field added successfully!`, {
         icon: '✅',
         duration: 2000,
@@ -75,25 +74,39 @@ const FormBuilderCanvas = ({ formTitle, formDescription, formId = '' }) => {
   };
 
   const handleQuestionUpdate = (index, updatedQuestion) => {
-    dispatch(updateQuestion({ index, question: updatedQuestion }));
+    const newQuestions = [...questions];
+    newQuestions[index] = updatedQuestion;
+    onQuestionsChange(newQuestions);
   };
 
   const handleQuestionDelete = (index) => {
-    dispatch(deleteQuestion(index));
+    const deletedQuestion = questions[index];
+    const newQuestions = questions.filter((_, i) => i !== index);
+    newQuestions.forEach((q, i) => {
+      q.order = i;
+    });
+    onQuestionsChange(newQuestions);
+
     toast.success('Question deleted', {
       duration: 3000,
     });
   };
 
   const handleQuestionMove = (index, direction) => {
-    dispatch(moveQuestion({ index, direction }));
-    
-    const canMove = (direction === 'up' && index > 0) || 
-                    (direction === 'down' && index < questions.length - 1);
-    
-    if (canMove) {
+    const newQuestions = [...questions];
+    const newIndex = direction === 'up' ? index - 1 : index + 1;
+
+    if (newIndex >= 0 && newIndex < questions.length) {
+      [newQuestions[index], newQuestions[newIndex]] =
+        [newQuestions[newIndex], newQuestions[index]];
+
+      newQuestions.forEach((q, i) => {
+        q.order = i;
+      });
+      onQuestionsChange(newQuestions);
+
       toast.success(`Question moved ${direction}`, {
-               icon: direction === 'up' ? '⬆️' : '⬇️',
+        icon: direction === 'up' ? '⬆️' : '⬇️',
         duration: 1500,
         position: 'bottom-center',
       });
@@ -103,69 +116,97 @@ const FormBuilderCanvas = ({ formTitle, formDescription, formId = '' }) => {
       });
     }
   };
-  
-  // Original handleQuestionDuplicate logic
+
   const handleQuestionDuplicate = (duplicatedQuestion) => {
-    dispatch(duplicateQuestion(duplicatedQuestion));
+    const questionToDuplicate = {
+      ...duplicatedQuestion,
+      _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      order: questions.length
+    };
+
+    const newQuestions = [...questions, questionToDuplicate];
+    onQuestionsChange(newQuestions);
+
     toast.success('Question duplicated successfully!', {
       duration: 2000,
     });
   };
-  
-  // Original drag and drop handlers for reordering
+
+  // New drag and drop handlers for reordering questions
   const handleQuestionDragStart = (index) => {
-    dispatch(setDraggedQuestionIndex(index));
+    setDraggedQuestionIndex(index);
   };
-  
+
   const handleQuestionDragOver = (e, index) => {
     e.preventDefault();
     if (draggedQuestionIndex === null) return;
-    
-    dispatch(setDragOverIndex(index));
-    
+
+    setDragOverIndex(index);
+
+    // Add visual feedback
     const dropIndicator = e.currentTarget;
     if (dropIndicator) {
       dropIndicator.classList.add('drag-over');
     }
   };
-  
+
   const handleQuestionDrop = (e, dropIndex) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
+    // Remove visual feedback
     const dropIndicator = e.currentTarget;
     if (dropIndicator) {
       dropIndicator.classList.remove('drag-over');
     }
-    
+
     if (draggedQuestionIndex === null || draggedQuestionIndex === dropIndex) {
-      dispatch(setDraggedQuestionIndex(null));
-      dispatch(setDragOverIndex(null));
+      setDraggedQuestionIndex(null);
+      setDragOverIndex(null);
       return;
     }
-    
-    dispatch(reorderQuestions({ draggedIndex: draggedQuestionIndex, dropIndex }));
-    dispatch(setDraggedQuestionIndex(null));
-    dispatch(setDragOverIndex(null));
-    
+
+    const newQuestions = [...questions];
+    const draggedQuestion = newQuestions[draggedQuestionIndex];
+
+    // Remove the dragged question from its original position
+    newQuestions.splice(draggedQuestionIndex, 1);
+
+    // Insert it at the new position
+    newQuestions.splice(dropIndex, 0, draggedQuestion);
+
+    // Update the order property for all questions
+    newQuestions.forEach((q, index) => {
+      q.order = index;
+    });
+
+    // Update the state
+    onQuestionsChange(newQuestions);
+
+    // Reset drag state
+    setDraggedQuestionIndex(null);
+    setDragOverIndex(null);
+
     toast.success('Question reordered', {
       icon: '↕️',
       duration: 1500,
     });
   };
-  
+
   const handleQuestionDragEnd = () => {
-    dispatch(setDraggedQuestionIndex(null));
-    dispatch(setDragOverIndex(null));
-    
+    // Clean up any remaining drag states
+    setDraggedQuestionIndex(null);
+    setDragOverIndex(null);
+
+    // Remove any remaining visual feedback
     document.querySelectorAll('.drag-over').forEach(el => {
       el.classList.remove('drag-over');
     });
   };
-  
-  // Original JSX structure - UNCHANGED
+
   return (
     <div className={`form-builder-canvas ${formId ? 'disabled' : ''}`}>
+      {/* Header Section */}
       <div className="form-header-section">
         <div className="form-header-label">Header</div>
         <div className="form-header-card">
@@ -175,7 +216,8 @@ const FormBuilderCanvas = ({ formTitle, formDescription, formId = '' }) => {
           </div>
         </div>
       </div>
-      
+
+      {/* Drag and Drop Section */}
       <div className="drag-drop-section">
         <div
           className={`drop-zone ${draggedOver ? 'dragging' : ''} ${questions.length === 0 ? 'empty' : ''}`}
@@ -216,3 +258,4 @@ const FormBuilderCanvas = ({ formTitle, formDescription, formId = '' }) => {
 };
 
 export default FormBuilderCanvas;
+

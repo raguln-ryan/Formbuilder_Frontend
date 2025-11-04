@@ -65,13 +65,23 @@ const ViewFormPage = () => {
   const TITLE_CHAR_LIMIT = 100;
   const DESCRIPTION_CHAR_LIMIT = 500;
 
-  // Load form data immediately when component mounts
+  // Add this after your useSelector hooks to debug
+  useEffect(() => {
+    console.log('ViewFormPage - Current State:', {
+      formData,
+      questions,
+      loading,
+      formId
+    });
+  }, [formData, questions, loading, formId]);
+
+  // Also log when fetching
   useEffect(() => {
     if (formId) {
-      // Always fetch form data when formId is available
+      console.log('Fetching form details for ID:', formId);
       dispatch(fetchFormDetails(formId));
     }
-  }, [formId, dispatch]); // Remove lastFetchedFormId from dependencies to ensure it loads
+  }, [formId, dispatch]);
 
   // Debug log to see what's happening
   useEffect(() => {
@@ -266,15 +276,18 @@ const ViewFormPage = () => {
   };
 
   const handleTabChange = (tab) => {
-    setActiveTab(tab);
-    if (tab === 'responses' && responses.length === 0) {
-      dispatch(fetchResponses({
-        formId,
-        page: currentPage,
-        pageSize: itemsPerPage,
-        searchTerm
-      }));
-    }
+    // Add a small delay to ensure state is updated
+    setTimeout(() => {
+      setActiveTab(tab);
+      if (tab === 'responses' && responses.length === 0) {
+        dispatch(fetchResponses({
+          formId,
+          page: currentPage,
+          pageSize: itemsPerPage,
+          searchTerm
+        }));
+      }
+    }, 100);
   };
 
   const handlePreview = () => {
@@ -391,7 +404,7 @@ const ViewFormPage = () => {
           </div>
         </div>
 
-        <div className="tab-content-wrapper" key={activeTab}>
+        <div className="tab-content-wrapper">
           {activeTab === 'configuration' && (
             <FormConfig
               formData={formData || { title: '', description: '', isVisible: true }}
@@ -406,17 +419,17 @@ const ViewFormPage = () => {
             />
           )}
 
-          {activeTab === 'layout' && (
+          {activeTab === 'layout' && questions && questions.length > 0 && (
             <div className="form-editor-content-area1">
               <div className="form-layout-wrapper">
                 <SectionEditor
+                  key={`section-${questions.length}`}  // Add this
                   questions={questions || []}
                   onQuestionsChange={handleQuestionsChange}
                   formTitle={formData?.title || ''}
                   formDescription={formData?.description || ''}
-                  formId={formId}
                 />
-
+                
                 <div className="form-config-actions-wrapper">
                   <button
                     className="action-button action-button-secondary"
@@ -433,6 +446,14 @@ const ViewFormPage = () => {
                     {saving ? 'Saving...' : 'Save'}
                   </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'layout' && (!questions || questions.length === 0) && (
+            <div className="form-editor-content-area1">
+              <div className="loading-container">
+                <p>Loading questions...</p>
               </div>
             </div>
           )}
