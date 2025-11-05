@@ -385,7 +385,7 @@
     return (
       <>
         <NavigationBar />
-        <div className="submission-view-wrapper" style={{'max-height': 'calc(100vh - 285px)', height: 'calc(100vh - 285px)'}}>
+        <div className="submission-view-wrapper" style={{'max-height': 'calc(100vh - 56px)', height: 'calc(100vh - 56px)'}}>
           <div className="submission-view-card">
             <h2 className="submission-view-title">
               {submission.formTitle || formDetails?.title || 'Form Submission'}
