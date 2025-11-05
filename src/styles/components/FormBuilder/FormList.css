@@ -162,6 +162,7 @@
   background: #F0F0F0;
   color: #333333;
   padding: 12px 24px;
+  position: relative;
 
 }
 
@@ -373,6 +374,12 @@
   top: 5px;
   right: 20px;
   z-index: 10;
+  box-shadow: 0px 1px 3px 0px #0000004D;
+box-shadow: 0px 4px 8px 3px #00000026;
+border-radius: 8px;
+
+overflow: hidden;
+
 }
 
 .menu-dots {
@@ -391,6 +398,9 @@
   transition-property: background-color, transform;
   transition-duration: 200ms;
   transition-timing-function: ease;
+      position: absolute;
+    right: 12px;
+    top: 20px;
 }
 
 .menu-dots:hover {
@@ -409,7 +419,7 @@
 .dropdown-menu {
   flex-flow: vertical;
  width: 160px;
- height : 136px;
+ /* height : 136px; */
  padding: 6px 8px;
 background: #FFFFFF;
 

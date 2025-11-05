@@ -23,8 +23,8 @@
 
 .section-editor-right {
   width: 996px;
-  max-height: calc(100vh - 48px - 24px - 120px); 
-  height: calc(100vh - 48px - 24px - 120px); 
+  max-height: calc(100vh - 48px - 24px - 174px); 
+  height: calc(100vh - 48px - 24px - 174px); 
   border-radius: 16px;
   border: 1px solid #DBDBDB;
   background-color: #EEEEEE;

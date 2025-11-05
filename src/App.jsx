@@ -24,16 +24,18 @@ function App() {
             duration: 4000,
             style: {
               background: '#363636',
-              color: '#fff',
+              color: '#000000',
             },
             success: {
               style: {
-                background: '#4caf50',
+                background: '#ECF8F2',
+                color: '#000000',
               },
             },
             error: {
               style: {
-                background: '#f44336',
+                background: '#F9DFDE',
+                color: '#000000',
               },
             },
           }}

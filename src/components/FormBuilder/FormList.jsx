@@ -300,10 +300,7 @@ const FormList = () => {
     const currentForm = forms.find(f => f.formId === formId);
     const newStatus = !currentForm?.isEnabled;
     
-    toast.success(`Form ${newStatus ? 'enabled' : 'disabled'}`, {
-      duration: 2000,
-      icon: newStatus ? '✅' : '⏸️',
-    });
+    toast.success(`Form ${newStatus ? 'enabled' : 'disabled'}`);
   };
 
   const handlePublish = async (formId) => {
@@ -398,15 +395,7 @@ const FormList = () => {
             {forms.map((form) => (
               <div key={form.formId} className="form-card">
                 <div className="menu-container">
-                  <button
-                    className="menu-dots"
-                    onClick={(e) => toggleMenu(form.formId, e)}
-                    aria-label="More options"
-                  >
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </button>
+                  
                   {activeMenu === form.formId && (
                     <div className="dropdown-menu">
                       {form.status === 0 ? (
@@ -437,7 +426,18 @@ const FormList = () => {
 
                 <div className="form-card-content">
 
-                  <h3 className="form-name">{form.title || 'Untitled Form'}</h3>
+                  <h3 className="form-name">{form.title || 'Untitled Form'}
+                    <button
+                    className="menu-dots"
+                    onClick={(e) => toggleMenu(form.formId, e)}
+                    aria-label="More options"
+                  >
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </button>
+                  </h3>
+                  
 
                   <div className="form-details">
                     {form.status === 0 ? (

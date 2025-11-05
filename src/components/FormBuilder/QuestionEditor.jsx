@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Input from '../Common/Input';
 import Button from '../Common/Button';
 import '../../styles/components/FormBuilder/QuestionEditor.css';
 import elements from '../../assets/elements.png';
 import TrashBin from '../../assets/TrashBin.png';
 import Threedot from './../../assets/Threedot.png';
+import file from './../../assets/file.png';
 
 const QuestionEditor = ({
   question,
   index,
   totalQuestions,
+  isEditing,
   onUpdate,
   onDelete,
   onMove,
@@ -20,8 +22,12 @@ const QuestionEditor = ({
   onDrop,
   isDragging
 }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
   const [localQuestion, setLocalQuestion] = useState(question);
+
+  // Update local question when prop changes
+  useEffect(() => {
+    setLocalQuestion(question);
+  }, [question]);
 
   console.log(localQuestion)
 
@@ -52,7 +58,8 @@ const QuestionEditor = ({
     }
   };
 
-  const handleDuplicate = () => {
+  const handleDuplicate = (e) => {
+    e.stopPropagation(); // Prevent triggering edit mode
     // Create a copy of the question with a new ID
     const duplicatedQuestion = {
       ...localQuestion,
@@ -64,6 +71,11 @@ const QuestionEditor = ({
       }))
     };
     onDuplicate(duplicatedQuestion);
+  };
+
+  const handleDeleteClick = (e) => {
+    e.stopPropagation(); // Prevent triggering edit mode
+    onDelete();
   };
 
   const getQuestionTypeLabel = (type) => {
@@ -80,9 +92,9 @@ const QuestionEditor = ({
 
   const getQuestionTypeDescription = (type) => {
     const descriptions = {
-      short_text: 'Short Text(Upto 100 Characters)',
-      long_text: 'Long Text(Upto 500 Characters)',
-      number: 'Numeric  Value',
+      short_text: 'Short Text (Up to 100 Characters)',
+      long_text: 'Long Text (Up to 500 Characters)',
+      number: 'Numeric Value',
       date_picker: 'DD/MM/YY',
       choice: 'Dropdown selection',
       file_upload: 'One file allowed'
@@ -134,227 +146,286 @@ const QuestionEditor = ({
   const isFileUpload = localQuestion.type === 'file_upload';
   const isDropdown = localQuestion.type === 'choice';
 
-  return (
-    <div
-      className={`question-editor ${isExpanded ? 'expanded' : 'collapsed'} ${isDragging ? 'dragging' : ''}`}
-      onDragOver={handleDragOver}
-      onDrop={handleDrop}
-    >
-      {isExpanded && (
-        <div className="question-body">
-          <div className="question-form">
-            {/* Three-dot drag handle */}
-            <div
-              className="drag-handle-wrapper"
-              draggable="true"
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              title="Drag to reorder"
-              style={{ cursor: 'move' }}
-            >
-              <img src={Threedot} alt="Drag to reorder" className="three-dot" />
+  // Render display mode (when not editing)
+  const renderDisplayMode = () => {
+    return (
+      <div className="question-display-mode">
+        <p className="question-display-title">
+          {localQuestion.question || `Click here to add ${getQuestionTypeLabel(localQuestion.type).toLowerCase()} title`}
+        </p>
+
+        {localQuestion.description_enabled && localQuestion.description && (
+          <p className="question-display-description">
+            {localQuestion.description}
+          </p>
+        )}
+
+        <div className="question-type-hint" style={{padding: localQuestion.type === 'file_upload' ? 0 : ''}}>
+          {localQuestion.type === 'date_picker'
+            ? localQuestion.date_format || 'DD/MM/YYYY'
+            : localQuestion.type === 'file_upload' ?
+            <></> :
+            getQuestionTypeDescription(localQuestion.type)
+          }
+        </div>
+
+        {hasOptions && localQuestion.options?.map((option, idx) => (
+          <div key={option._id} className="display-option-item">
+            {option.value}
+          </div>
+        ))}
+
+        {isFileUpload ? (
+          <div className="file-upload-display">
+            <img src={file} alt="File Upload" className="file-icon" />
+            <div className="file-info">
+              <p>File Upload (Only one file allowed)</p>
+              <p className="file-support">Supported files: PDF, PNG, JPG | Max file size 2 MB</p>
             </div>
+          </div>
+        ) : <></>}
+      </div>
+    );
+  };
 
-            <Input
-              value={localQuestion.question || ''}
-              onChange={(e) => handleFieldChange('question', e.target.value)}
-              placeholder="Untitled question"
-              required
-            />
-            {localQuestion.description_enabled && (
-              <Input
-                type="textarea"
-                label="Description"
-                value={localQuestion.description || ''}
-                onChange={(e) => handleFieldChange('description', e.target.value)}
-                placeholder="Add helpful text for this question"
-                rows={2}
-              />
-            )}
-
-            {/* Question Type Display - Disabled */}
-            <div className="question-type-display">
-              <label className="type-label">Question Type</label>
-              <div className="type-info-box">
-                <div className="type-name">
-                  {
-                    localQuestion.type === 'date_picker' ?
-                      localQuestion.date_format :
-                      getQuestionTypeDescription(localQuestion.type)
-                  }
-                </div>
-              </div>
-            </div>
-
-            {localQuestion.type === 'date_picker' && (
-              <div className="date-wrap">
-                {/* Date Format Radio Buttons */}
-                <div className="date-format-group">
-                  <span className="format-label">Date Format:</span>
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name={`dateformat-${localQuestion._id}`}
-                      value="DD/MM/YYYY"
-                      checked={(localQuestion.date_format || "DD/MM/YYYY") === "DD/MM/YYYY"}
-                      onChange={() => handleFieldChange('date_format', 'DD/MM/YYYY')}
-                    />
-                    <span>DD/MM/YYYY</span>
-                  </label>
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name={`dateformat-${localQuestion._id}`}
-                      value="DD-MM-YYYY"
-                      checked={localQuestion.date_format === "DD-MM-YYYY"}
-                      onChange={() => handleFieldChange('date_format', 'DD-MM-YYYY')}
-                    />
-                    <span>DD-MM-YYYY</span>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Selection Type for Dropdown */}
-            {isDropdown && (
-              <div className="form-row">
-                <label className="selection-type-label">Selection Type</label>
-                <div className="selection-type-group">
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name={`selection-type-${index}`}
-                      value="single"
-                      checked={localQuestion.multiple_choice !== true}
-                      onChange={() => {
-                        const updated = {
-                          ...localQuestion,
-                          single_choice: true,
-                          multiple_choice: false
-                        };
-                        setLocalQuestion(updated);
-                        onUpdate(updated); // Update parent with both fields at once
-                      }}
-                      style={{marginRight: 8}}
-                    />
-                    <span>Single Select</span>
-                  </label>
-                  <label className="radio-option">
-                    <input
-                      type="radio"
-                      name={`selection-type-${index}`}
-                      value="multiple"
-                      checked={localQuestion.multiple_choice === true}
-                      onChange={() => {
-                        const updated = {
-                          ...localQuestion,
-                          single_choice: false,
-                          multiple_choice: true
-                        };
-                        setLocalQuestion(updated);
-                        onUpdate(updated); // Update parent with both fields at once
-                      }}
-                      style={{marginRight: 8}}
-                    />
-                    <span>Multi Select</span>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* File Upload Configuration */}
-            {isFileUpload && (
-              <div className="file-config-info">
-                <div className="file-info-item">
-                  <span className="info-icon">📎</span>
-                  <span className="info-text">Supported files: PDF, PNG, JPG</span>
-                </div>
-                <div className="file-info-item">
-                  <span className="info-text">Max file size: 2 MB</span>
-                </div>
-              </div>
-            )}
-
-
-            {hasOptions && (
-              <div className="options-section">
-                <div className="options-header">
-                  <label className="options-label">Answer Options</label>
-                  <Button size="small" onClick={addOption}>
-                    + Add Option
-                  </Button>
-                </div>
-
-                <div className="options-list">
-                  {(localQuestion.options || []).map((option, optionIndex) => (
-                    <div key={option._id || optionIndex} className="option-item">
-                      <span className="option-number">{optionIndex + 1}.</span>
-                      <Input
-                        value={option.value}
-                        onChange={(e) => handleOptionChange(optionIndex, e.target.value)}
-                        placeholder={`Option ${optionIndex + 1}`}
-                      />
-                      <button
-                        className="remove-option-btn"
-                        onClick={() => removeOption(optionIndex)}
-                        disabled={localQuestion.options.length <= 2}
-                        title="Remove option"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+  // Render edit mode (when editing)
+  const renderEditMode = () => {
+    return (
+      <div className="question-body" onClick={(e) => e.stopPropagation()}>
+        <div className="question-form">
+          {/* Three-dot drag handle */}
+          <div
+            className="drag-handle-wrapper"
+            draggable="true"
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            title="Drag to reorder"
+            style={{ cursor: 'move' }}
+          >
+            <img src={Threedot} alt="Drag to reorder" className="three-dot" />
           </div>
 
-          {/* Bottom Actions Bar */}
-          <div className="question-bottom-actions">
-            <div className="actions-right-container">
-              {/* Copy Button */}
-              <button
-                className="action-button copy"
-                onClick={handleDuplicate}
-                title="Duplicate Question"
-              >
-                <img src={elements} alt="Copy" className="action-icon" />
-              </button>
+          <Input
+            value={localQuestion.question || ''}
+            onChange={(e) => handleFieldChange('question', e.target.value)}
+            placeholder={`Add ${getQuestionTypeLabel(localQuestion.type).toLowerCase()} title`}
+            required
+          />
+          {localQuestion.description_enabled && (
+            <Input
+              type="textarea"
+              label="Description"
+              value={localQuestion.description || ''}
+              onChange={(e) => handleFieldChange('description', e.target.value)}
+              placeholder="Add helpful text for this question"
+              rows={2}
+            />
+          )}
 
-              {/* Delete Button */}
-              <button
-                className="action-button delete"
-                onClick={onDelete}
-                title="Delete Question"
-              >
-                <img src={TrashBin} alt="Delete" className="action-icon" />
-              </button>
-
-              {/* Description Toggle */}
-              <label className="toggle-switch description-toggle">
-                <span className="toggle-label">Description</span>
-                <input
-                  type="checkbox"
-                  checked={localQuestion.description_enabled || false}
-                  onChange={(e) => handleFieldChange('description_enabled', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-
-              {/* Required Toggle */}
-              <label className="toggle-switch required-toggle">
-                <span className="toggle-label">Required</span>
-                <input
-                  type="checkbox"
-                  checked={localQuestion.required || false}
-                  onChange={(e) => handleFieldChange('required', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
+          {/* Question Type Display - Disabled */}
+          <div className="question-type-display">
+            <label className="type-label">Question Type</label>
+            <div className="type-info-box">
+              <div className="type-name">
+                {
+                  localQuestion.type === 'date_picker' ?
+                    localQuestion.date_format :
+                    localQuestion.type === 'file_upload' ?
+                    <div className="file-config-info">
+                
+              <div className="file-info-item">
+                <img src={file} alt="File Upload" className="file-icon" />
+              </div>
+              <div style={{display: 'flex', flexDirection: 'column', marginLeft: 16}}>
+                <span className="info-text">Supported files: PDF, PNG, JPG</span>
+                <span className="info-text">Max file size: 2 MB</span>
+              </div>
+              <div className="file-info-item">
+              </div>
             </div>
+                     :
+                    getQuestionTypeDescription(localQuestion.type)
+                }
+
+              </div>
+            </div>
+          </div>
+
+
+
+          {localQuestion.type === 'date_picker' && (
+            <div className="date-wrap">
+              {/* Date Format Radio Buttons */}
+              <div className="date-format-group">
+                <span className="format-label">Date Format:</span>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name={`dateformat-${localQuestion._id}`}
+                    value="DD/MM/YYYY"
+                    checked={(localQuestion.date_format || "DD/MM/YYYY") === "DD/MM/YYYY"}
+                    onChange={() => handleFieldChange('date_format', 'DD/MM/YYYY')}
+                  />
+                  <span>DD/MM/YYYY</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name={`dateformat-${localQuestion._id}`}
+                    value="DD-MM-YYYY"
+                    checked={localQuestion.date_format === "DD-MM-YYYY"}
+                    onChange={() => handleFieldChange('date_format', 'DD-MM-YYYY')}
+                  />
+                  <span>DD-MM-YYYY</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Selection Type for Dropdown */}
+          {isDropdown && (
+            <div className="form-row">
+              <label className="selection-type-label">Selection Type</label>
+              <div className="selection-type-group">
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name={`selection-type-${index}`}
+                    value="single"
+                    checked={localQuestion.multiple_choice !== true}
+                    onChange={() => {
+                      const updated = {
+                        ...localQuestion,
+                        single_choice: true,
+                        multiple_choice: false
+                      };
+                      setLocalQuestion(updated);
+                      onUpdate(updated); // Update parent with both fields at once
+                    }}
+                    style={{ marginRight: 8 }}
+                  />
+                  <span>Single Select</span>
+                </label>
+                <label className="radio-option">
+                  <input
+                    type="radio"
+                    name={`selection-type-${index}`}
+                    value="multiple"
+                    checked={localQuestion.multiple_choice === true}
+                    onChange={() => {
+                      const updated = {
+                        ...localQuestion,
+                        single_choice: false,
+                        multiple_choice: true
+                      };
+                      setLocalQuestion(updated);
+                      onUpdate(updated); // Update parent with both fields at once
+                    }}
+                    style={{ marginRight: 8, marginLeft: 8 }}
+                  />
+                  <span>Multi Select</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* File Upload Configuration */}
+          {isFileUpload && (
+            <></>
+          )}
+
+
+          {hasOptions && (
+            <div className="options-section">
+              <div className="options-header">
+                <label className="options-label">Answer Options</label>
+                <Button size="small" onClick={addOption}>
+                  + Add Option
+                </Button>
+              </div>
+              <div className="options-list">
+                {(localQuestion.options || []).map((option, optionIndex) => (
+                  <div key={option._id || optionIndex} className="option-item">
+                    <span className="option-number">{optionIndex + 1}.</span>
+                    <Input
+                      value={option.value}
+                      onChange={(e) => handleOptionChange(optionIndex, e.target.value)}
+                      placeholder={`Option ${optionIndex + 1}`}
+                    />
+                    <button
+                      className="remove-option-btn"
+                      onClick={() => removeOption(optionIndex)}
+                      disabled={localQuestion.options.length <= 2}
+                      title="Remove option"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Bottom Actions Bar */}
+        <div className="question-bottom-actions">
+          <div className="actions-right-container">
+            {/* Copy Button */}
+            <button
+              className="action-button copy"
+              onClick={handleDuplicate}
+              title="Duplicate Question"
+            >
+              <img src={elements} alt="Copy" className="action-icon" />
+            </button>
+
+            {/* Delete Button */}
+            <button
+              className="action-button delete"
+              onClick={handleDeleteClick}
+              title="Delete Question"
+            >
+              <img src={TrashBin} alt="Delete" className="action-icon" />
+            </button>
+
+            {/* Description Toggle */}
+            <label className="toggle-switch description-toggle">
+              <span className="toggle-label">Description</span>
+              <input
+                type="checkbox"
+                checked={localQuestion.description_enabled || false}
+                onChange={(e) => handleFieldChange('description_enabled', e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+            </label>
+
+            {/* Required Toggle */}
+            <label className="toggle-switch required-toggle">
+              <span className="toggle-label">Required</span>
+              <input
+                type="checkbox"
+                checked={localQuestion.required || false}
+                onChange={(e) => handleFieldChange('required', e.target.checked)}
+              />
+              <span className="toggle-slider"></span>
+            </label>
           </div>
         </div>
-      )}
+      </div>
+    );
+  };
+
+  return (
+    <div
+      className={`question-editor ${isEditing ? 'expanded editing' : 'collapsed'} ${isDragging ? 'dragging' : ''}`}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      style={{
+        cursor: 'pointer',
+        borderRadius: '16px',
+      }}
+    >
+      {isEditing ? renderEditMode() : renderDisplayMode()}
     </div>
   );
 };

@@ -137,6 +137,8 @@
 
 .questions-container {
   position: relative;
+  width: 100%;
+  padding: 8px;
 }
 
 .question-editor {
@@ -175,3 +177,210 @@
   pointer-events: none;
   opacity: 0.7;
 }
+
+/* Placeholder styling when dragging */
+.drop-placeholder {
+  border: 2px dashed #7C3AED; /* purple dashed border */
+  border-radius: 10px;
+  background-color: rgba(124, 58, 237, 0.05);
+  padding: 40px;
+  text-align: center;
+  transition: all 0.2s ease-in-out;
+  animation: pulseFade 1.2s infinite ease-in-out;
+}
+
+.drop-placeholder p {
+  color: #7C3AED;
+  font-weight: 600;
+  font-size: 16px;
+  margin: 0;
+}
+
+/* Optional subtle animation for better feedback */
+@keyframes pulseFade {
+  0% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+}
+
+/* Optional: style the drop-zone when dragging */
+.drop-zone.dragging {
+  background-color: rgba(124, 58, 237, 0.05);
+  border: 2px dashed #7C3AED;
+  border-radius: 8px;
+  transition: background-color 0.2s ease;
+}
+
+
+.drag-drop-section {
+  position: relative;
+  min-height: 120px;
+  background-color: #fafafa;
+  border: 2px dashed transparent;
+  border-radius: 10px;
+  transition: all 0.2s ease-in-out;
+  display: flex;
+}
+
+.drag-drop-section.dragging {
+  border-color: #7c3aed;
+  background-color: rgba(124, 58, 237, 0.05);
+}
+
+/* Placeholder while dragging */
+.drop-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: 2px dashed #7c3aed;
+  border-radius: 10px;
+  background-color: rgba(124, 58, 237, 0.07);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadePulse 1.4s infinite ease-in-out;
+  pointer-events: none;
+}
+
+.drop-placeholder p {
+  color: #7c3aed;
+  font-weight: 600;
+  font-size: 16px;
+  text-align: center;
+  margin: 0;
+}
+
+@keyframes fadePulse {
+  0%, 100% {
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+
+.form-builder-canvas {
+  flex: 1;
+  padding: 20px;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+.form-builder-canvas.disabled {
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.form-header-section {
+  margin-bottom: 24px;
+}
+
+.form-header-label {
+  background: #5D38DF;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px 8px 0 0;
+  font-weight: 500;
+  display: inline-block;
+}
+
+.form-header-card {
+  background: white;
+  padding: 24px;
+  border-radius: 0 8px 8px 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-header-content {
+  margin: 0;
+}
+
+.form-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #333;
+}
+
+.form-description {
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.drag-drop-section {
+  min-height: 400px;
+  background: white;
+  border-radius: 16px;
+  /* padding: 20px; */
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.drag-drop-section.dragging-over {
+  background: #f0f8ff;
+  border: 2px dashed #5D38DF;
+}
+
+.questions-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.drop-zone-placeholder {
+  padding: 60px 20px;
+  text-align: center;
+  background: #F3F2F3;
+  border: 2px dashed #D8D8D8;
+  border-radius: 8px;
+  margin: 16px 0;
+}
+
+.drop-zone-placeholder p {
+  color: #666;
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  color: #999;
+}
+
+.drag-image {
+  width: 24px;
+  height: 24px;
+  opacity: 0.5;
+  margin-bottom: 16px;
+}
+
+.drag-text {
+  font-size: 16px;
+  color: #666;
+}
+
+.drag-over {
+  border-top: 3px solid #5D38DF;
+  padding-top: 16px;
+  transition: all 0.2s ease;
+}
+
+
