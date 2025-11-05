@@ -465,7 +465,7 @@ const FormList = () => {
                           <span className="form-detail-label">Published date:</span>
                           <span>
                             {form.publishedAt
-                              ? new Date(form.publishedAt).toLocaleDateString()
+                               ? new Date(form.createdAt).toLocaleDateString()
                               : 'N/A'}
                           </span>
                         </div>

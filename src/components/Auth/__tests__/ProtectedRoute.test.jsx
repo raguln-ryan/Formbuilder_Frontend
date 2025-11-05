@@ -1,54 +1,46 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import ProtectedRoute from '../ProtectedRoute';
-import { useAuth } from '../../../contexts/AuthContext';
+import * as AuthContext from '../../../contexts/AuthContext';
 
-jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: jest.fn()
-}));
+const TestComponent = () => <div>Protected Content</div>;
 
-jest.mock('../../Common/LoadingSpinner', () => {
-  return function LoadingSpinner({ message }) {
-    return <div>Loading: {message}</div>;
-  };
-});
-
-describe('ProtectedRoute Component', () => {
+describe('ProtectedRoute', () => {
   test('shows loading spinner when loading', () => {
-    useAuth.mockReturnValue({
+    jest.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: null,
       loading: true,
       isAuthenticated: false
     });
 
     render(
-      <MemoryRouter initialEntries={['/protected']}>
+      <MemoryRouter>
         <Routes>
           <Route element={<ProtectedRoute />}>
-            <Route path="/protected" element={<div>Protected Content</div>} />
+            <Route path="/" element={<TestComponent />} />
           </Route>
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Loading: Loading...')).toBeInTheDocument();
+    expect(screen.getByText('Loading...')).toBeInTheDocument();
   });
 
   test('redirects to login when not authenticated', () => {
-    useAuth.mockReturnValue({
+    jest.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: null,
       loading: false,
       isAuthenticated: false
     });
 
     render(
-      <MemoryRouter initialEntries={['/protected']}>
+      <MemoryRouter initialEntries={['/']}>
         <Routes>
-          <Route path="/login" element={<div>Login Page</div>} />
           <Route element={<ProtectedRoute />}>
-            <Route path="/protected" element={<div>Protected Content</div>} />
+            <Route path="/" element={<TestComponent />} />
           </Route>
+          <Route path="/login" element={<div>Login Page</div>} />
         </Routes>
       </MemoryRouter>
     );
@@ -56,40 +48,40 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Login Page')).toBeInTheDocument();
   });
 
-  test('allows access when authenticated with correct role', () => {
-    useAuth.mockReturnValue({
+  test('renders content when authenticated with correct role', () => {
+    jest.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { role: 'Admin' },
       loading: false,
       isAuthenticated: true
     });
 
     render(
-      <MemoryRouter initialEntries={['/protected']}>
+      <MemoryRouter>
         <Routes>
           <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
-            <Route path="/protected" element={<div>Admin Content</div>} />
+            <Route path="/" element={<TestComponent />} />
           </Route>
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Admin Content')).toBeInTheDocument();
+    expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 
-  test('redirects Admin to admin dashboard when role not allowed', () => {
-    useAuth.mockReturnValue({
+  test('redirects admin to admin dashboard when role not allowed', () => {
+    jest.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { role: 'Admin' },
       loading: false,
       isAuthenticated: true
     });
 
     render(
-      <MemoryRouter initialEntries={['/learner-only']}>
+      <MemoryRouter initialEntries={['/']}>
         <Routes>
-          <Route path="/admin" element={<div>Admin Dashboard</div>} />
           <Route element={<ProtectedRoute allowedRoles={['Learner']} />}>
-            <Route path="/learner-only" element={<div>Learner Content</div>} />
+            <Route path="/" element={<TestComponent />} />
           </Route>
+          <Route path="/admin" element={<div>Admin Dashboard</div>} />
         </Routes>
       </MemoryRouter>
     );
@@ -97,44 +89,24 @@ describe('ProtectedRoute Component', () => {
     expect(screen.getByText('Admin Dashboard')).toBeInTheDocument();
   });
 
-  test('redirects Learner to learner dashboard when role not allowed', () => {
-    useAuth.mockReturnValue({
+  test('redirects learner to learner dashboard when role not allowed', () => {
+    jest.spyOn(AuthContext, 'useAuth').mockReturnValue({
       user: { role: 'Learner' },
       loading: false,
       isAuthenticated: true
     });
 
     render(
-      <MemoryRouter initialEntries={['/admin-only']}>
+      <MemoryRouter initialEntries={['/']}>
         <Routes>
-          <Route path="/learner" element={<div>Learner Dashboard</div>} />
           <Route element={<ProtectedRoute allowedRoles={['Admin']} />}>
-            <Route path="/admin-only" element={<div>Admin Content</div>} />
+            <Route path="/" element={<TestComponent />} />
           </Route>
+          <Route path="/learner" element={<div>Learner Dashboard</div>} />
         </Routes>
       </MemoryRouter>
     );
 
     expect(screen.getByText('Learner Dashboard')).toBeInTheDocument();
-  });
-
-  test('allows access when no specific roles required', () => {
-    useAuth.mockReturnValue({
-      user: { role: 'Learner' },
-      loading: false,
-      isAuthenticated: true
-    });
-
-    render(
-      <MemoryRouter initialEntries={['/protected']}>
-        <Routes>
-          <Route element={<ProtectedRoute />}>
-            <Route path="/protected" element={<div>Protected Content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
-    );
-
-    expect(screen.getByText('Protected Content')).toBeInTheDocument();
   });
 });

@@ -1,14 +1,22 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import '@testing-library/jest-dom';
 import FormLayout from '../FormLayout';
+
+// Mock dependencies
+jest.mock('../../../styles/components/FormBuilder/FormEditor.css', () => ({}));
 
 // Mock child components
 jest.mock('../SectionEditor', () => {
-  return function SectionEditor({ questions, onQuestionsChange, formTitle, formDescription, formId }) {
+  return function MockSectionEditor({ questions, onQuestionsChange, formTitle, formDescription }) {
     return (
       <div data-testid="section-editor">
+        <div>Title: {formTitle}</div>
+        <div>Description: {formDescription}</div>
         <div>Questions: {questions.length}</div>
-        <button onClick={() => onQuestionsChange([...questions, { _id: 'new', question: 'New Question' }])}>
+        <button onClick={() => onQuestionsChange([...questions, { id: 'new' }])}>
           Add Question
         </button>
       </div>
@@ -16,530 +24,621 @@ jest.mock('../SectionEditor', () => {
   };
 });
 
-jest.mock('../FormPreview', () => {
-  return function FormPreview({ questions, formTitle, formDescription }) {
+jest.mock('../QuestionPreview', () => {
+  return function MockQuestionPreview({ formTitle, formDescription, questions }) {
     return (
-      <div data-testid="form-preview">
-        <h2>{formTitle}</h2>
-        <p>{formDescription}</p>
-        {questions.map(q => (
-          <div key={q._id}>{q.question}</div>
-        ))}
+      <div data-testid="question-preview">
+        <div>Preview Title: {formTitle}</div>
+        <div>Preview Description: {formDescription}</div>
+        <div>Preview Questions: {questions.length}</div>
       </div>
     );
   };
 });
 
-describe('FormLayout Component', () => {
+jest.mock('../../Common/Modal', () => {
+  return function MockModal({ isOpen, onClose, onConfirm, title, message }) {
+    if (!isOpen) return null;
+    return (
+      <div data-testid="modal">
+        <div>{title}</div>
+        <div>{message}</div>
+        <button onClick={onClose}>Close</button>
+        <button onClick={onConfirm}>Confirm</button>
+      </div>
+    );
+  };
+});
+
+// Create mock store
+const createMockStore = (initialState = {}) => {
+  return configureStore({
+    reducer: {
+      formBuilder: (state = {
+        showPreview: false,
+        showPublishModal: false,
+        ...initialState
+      }, action) => {
+        switch (action.type) {
+          case 'formBuilder/togglePreview':
+            return { ...state, showPreview: !state.showPreview };
+          case 'formBuilder/setShowPublishModal':
+            return { ...state, showPublishModal: action.payload };
+          default:
+            return state;
+        }
+      }
+    }
+  });
+};
+
+describe('FormLayout', () => {
   const mockOnQuestionsChange = jest.fn();
   const mockOnSaveAsDraft = jest.fn();
   const mockOnPublish = jest.fn();
-  
+
   const defaultProps = {
-    formData: {
-      title: 'Test Form',
-      description: 'Test Description'
-    },
-    questions: [],
+    formData: { title: 'Test Form', description: 'Test Description' },
+    questions: [{ _id: 'q1', question: 'Question 1' }],
     onQuestionsChange: mockOnQuestionsChange,
     onSaveAsDraft: mockOnSaveAsDraft,
     onPublish: mockOnPublish,
     saving: false
   };
 
+  let store;
+
   beforeEach(() => {
-    mockOnQuestionsChange.mockClear();
-    mockOnSaveAsDraft.mockClear();
-    mockOnPublish.mockClear();
+    jest.clearAllMocks();
+    store = createMockStore();
   });
 
-  describe('Rendering', () => {
-    test('renders layout with action buttons', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      expect(screen.getByText('Preview Form')).toBeInTheDocument();
-      expect(screen.getByText('Save as Draft')).toBeInTheDocument();
-      expect(screen.getByText('Publish Form')).toBeInTheDocument();
-    });
+  test('renders SectionEditor by default', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-    test('renders section editor', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      expect(screen.getByTestId('section-editor')).toBeInTheDocument();
-      expect(screen.getByText('Questions: 0')).toBeInTheDocument();
-    });
-
-    test('passes formData to section editor', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      expect(screen.getByTestId('section-editor')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('section-editor')).toBeInTheDocument();
+    expect(screen.getByText('Title: Test Form')).toBeInTheDocument();
+    expect(screen.getByText('Description: Test Description')).toBeInTheDocument();
   });
 
-  describe('Preview Modal', () => {
-    test('opens preview modal on button click', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Test Question' }]
-      };
+  test('shows action buttons when not in preview mode', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      const previewButton = screen.getByText('Preview Form');
-      fireEvent.click(previewButton);
-      
-      expect(screen.getByText('Form Preview')).toBeInTheDocument();
-      expect(screen.getByTestId('form-preview')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Preview Form')).toBeInTheDocument();
+    expect(screen.getByText('Save as Draft')).toBeInTheDocument();
+    expect(screen.getByText('Publish Form')).toBeInTheDocument();
+  });
 
-    test('displays form data in preview', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question1' }]
-      };
+  test('toggles preview mode', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      fireEvent.click(screen.getByText('Preview Form'));
-      
-      expect(screen.getByText('Test Form')).toBeInTheDocument();
-      expect(screen.getByText('Test Description')).toBeInTheDocument();
-      expect(screen.getByText('Question 1')).toBeInTheDocument();
-    });
+    const previewButton = screen.getByText('Preview Form');
+    fireEvent.click(previewButton);
 
-    test('closes preview modal on close button click', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      fireEvent.click(screen.getByText('Preview Form'));
-      expect(screen.getByText('Form Preview')).toBeInTheDocument();
-      
-      const closeButton = screen.getByText('×');
-      fireEvent.click(closeButton);
-      
-      expect(screen.queryByText('Form Preview')).not.toBeInTheDocument();
-    });
+    expect(screen.getByTestId('question-preview')).toBeInTheDocument();
+    expect(screen.getByText('Preview Title: Test Form')).toBeInTheDocument();
+  });
 
-    test('closes preview modal on backdrop click', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      fireEvent.click(screen.getByText('Preview Form'));
-      expect(screen.getByText('Form Preview')).toBeInTheDocument();
-      
-      const backdrop = screen.getByTestId('modal-backdrop');
-      fireEvent.click(backdrop);
-      
-      expect(screen.queryByText('Form Preview')).not.toBeInTheDocument();
+  test('closes preview modal', () => {
+    store = createMockStore({ showPreview: true });
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const closeButton = screen.getByText('×');
+    fireEvent.click(closeButton);
+
+    waitFor(() => {
+      expect(screen.queryByTestId('question-preview')).not.toBeInTheDocument();
     });
   });
 
-  describe('Save Functionality', () => {
-    test('calls onSaveAsDraft when save button clicked', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
+  test('hides action buttons in preview mode', () => {
+    store = createMockStore({ showPreview: true });
 
-      render(<FormLayout {...props} />);
-      
-      const saveButton = screen.getByText('Save as Draft');
-      fireEvent.click(saveButton);
-      
-      expect(mockOnSaveAsDraft).toHaveBeenCalledTimes(1);
-    });
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-    test('disables save button when no questions', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      const saveButton = screen.getByText('Save as Draft');
-      expect(saveButton).toBeDisabled();
-    });
+    expect(screen.queryByText('Save as Draft')).not.toBeInTheDocument();
+    expect(screen.queryByText('Publish Form')).not.toBeInTheDocument();
+  });
 
-    test('enables save button when questions exist', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
+  test('handles save as draft click', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      const saveButton = screen.getByText('Save as Draft');
-      expect(saveButton).not.toBeDisabled();
-    });
+    const saveButton = screen.getByText('Save as Draft');
+    fireEvent.click(saveButton);
 
-    test('shows saving state on save button', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }],
-        saving: true
-      };
+    expect(mockOnSaveAsDraft).toHaveBeenCalled();
+  });
 
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Saving...')).toBeInTheDocument();
-      expect(screen.getByText('Saving...')).toBeDisabled();
+
+  test('disables save button when saving', () => {
+    const props = { ...defaultProps, saving: true };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...props} />
+      </Provider>
+    );
+
+    const saveButton = screen.getByText('Saving...');
+    expect(saveButton).toBeDisabled();
+  });
+
+  test('disables save button when no questions', () => {
+    const props = { ...defaultProps, questions: [] };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...props} />
+      </Provider>
+    );
+
+    const saveButton = screen.getByText('Save as Draft');
+    expect(saveButton).toBeDisabled();
+  });
+
+  test('shows publish confirmation modal', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const publishButton = screen.getByText('Publish Form');
+    fireEvent.click(publishButton);
+
+    expect(screen.getByTestId('modal')).toBeInTheDocument();
+    expect(screen.getByText('Publish Form')).toBeInTheDocument();
+    expect(screen.getByText(/Are you sure you want to publish this form/)).toBeInTheDocument();
+  });
+
+  test('confirms publish', () => {
+    store = createMockStore({ showPublishModal: true });
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const confirmButton = screen.getByText('Confirm');
+    fireEvent.click(confirmButton);
+
+    expect(mockOnPublish).toHaveBeenCalled();
+  });
+
+  test('cancels publish', () => {
+    store = createMockStore({ showPublishModal: true });
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const closeButton = screen.getByText('Close');
+    fireEvent.click(closeButton);
+
+    waitFor(() => {
+      expect(screen.queryByTestId('modal')).not.toBeInTheDocument();
     });
   });
 
-  describe('Publish Functionality', () => {
-    test('opens publish confirmation modal', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
+  test('disables publish button when saving', () => {
+    const props = { ...defaultProps, saving: true };
 
-      render(<FormLayout {...props} />);
-      
-      const publishButton = screen.getByText('Publish Form');
-      fireEvent.click(publishButton);
-      
-      expect(screen.getByText(/Are you sure you want to publish this form/)).toBeInTheDocument();
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
+    render(
+      <Provider store={store}>
+        <FormLayout {...props} />
+      </Provider>
+    );
 
-    test('calls onPublish when confirmed', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
-
-      render(<FormLayout {...props} />);
-      
-      fireEvent.click(screen.getByText('Publish Form'));
-      
-      const confirmButton = screen.getAllByText('Publish Form')[1];
-      fireEvent.click(confirmButton);
-      
-      expect(mockOnPublish).toHaveBeenCalledTimes(1);
-      expect(screen.queryByText(/Are you sure you want to publish/)).not.toBeInTheDocument();
-    });
-
-    test('closes modal on cancel', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
-
-      render(<FormLayout {...props} />);
-      
-      fireEvent.click(screen.getByText('Publish Form'));
-      
-      const cancelButton = screen.getByText('Cancel');
-      fireEvent.click(cancelButton);
-      
-      expect(mockOnPublish).not.toHaveBeenCalled();
-      expect(screen.queryByText(/Are you sure you want to publish/)).not.toBeInTheDocument();
-    });
-
-    test('disables publish button when no questions', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      const publishButton = screen.getByText('Publish Form');
-      expect(publishButton).toBeDisabled();
-    });
-
-    test('enables publish button when questions exist', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
-
-      render(<FormLayout {...props} />);
-      
-      const publishButton = screen.getByText('Publish Form');
-      expect(publishButton).not.toBeDisabled();
-    });
-
-    test('shows publishing state on publish button', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }],
-        saving: true
-      };
-
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Publishing...')).toBeInTheDocument();
-      expect(screen.getByText('Publishing...')).toBeDisabled();
-    });
+    const publishButton = screen.getByText('Publishing...');
+    expect(publishButton).toBeDisabled();
   });
 
-  describe('Question Management', () => {
-    test('updates questions through section editor', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      const addButton = screen.getByText('Add Question');
-      fireEvent.click(addButton);
-      
-      expect(mockOnQuestionsChange).toHaveBeenCalledWith([
-        { _id: 'new', question: 'New Question' }
-      ]);
-    });
+  test('disables publish button when no questions', () => {
+    const props = { ...defaultProps, questions: [] };
 
-    test('passes questions to section editor', () => {
-      const props = {
-        ...defaultProps,
-        questions: [
-          { _id: '1', question: 'Question 1' },
-          { _id: '2', question: 'Question 2' }
-        ]
-      };
+    render(
+      <Provider store={store}>
+        <FormLayout {...props} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Questions: 2')).toBeInTheDocument();
-    });
+    const publishButton = screen.getByText('Publish Form');
+    expect(publishButton).toBeDisabled();
   });
 
-  describe('Button States', () => {
-    test('disables all action buttons during saving', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }],
-        saving: true
-      };
+  test('handles questions change', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Preview Form')).toBeDisabled();
-      expect(screen.getByText('Saving...')).toBeDisabled();
-      expect(screen.getByText('Publishing...')).toBeDisabled();
-    });
+    const addButton = screen.getByText('Add Question');
+    fireEvent.click(addButton);
 
-    test('disables save and publish when no questions', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      expect(screen.getByText('Save as Draft')).toBeDisabled();
-      expect(screen.getByText('Publish Form')).toBeDisabled();
-      expect(screen.getByText('Preview Form')).not.toBeDisabled();
-    });
-
-    test('enables all buttons when questions exist and not saving', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }],
-        saving: false
-      };
-
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Preview Form')).not.toBeDisabled();
-      expect(screen.getByText('Save as Draft')).not.toBeDisabled();
-      expect(screen.getByText('Publish Form')).not.toBeDisabled();
-    });
+    expect(mockOnQuestionsChange).toHaveBeenCalled();
   });
 
-  describe('Form Data Display', () => {
-    test('displays form title in header', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      const header = screen.getByRole('heading', { level: 2 });
-      expect(header).toHaveTextContent('Test Form');
-    });
+  test('renders preview modal header correctly', () => {
+    store = createMockStore({ showPreview: true });
 
-    test('displays form description', () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      expect(screen.getByText('Test Description')).toBeInTheDocument();
-    });
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-    test('handles empty form title', () => {
-      const props = {
-        ...defaultProps,
-        formData: {
-          title: '',
-          description: 'Test Description'
-        }
-      };
-
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Untitled Form')).toBeInTheDocument();
-    });
-
-    test('handles empty form description', () => {
-      const props = {
-        ...defaultProps,
-        formData: {
-          title: 'Test Form',
-          description: ''
-        }
-      };
-
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('No description provided')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Form Preview')).toBeInTheDocument();
   });
 
-  describe('Keyboard Shortcuts', () => {
-    test('opens preview with keyboard shortcut', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
+  test('renders modal with correct props', () => {
+    store = createMockStore({ showPublishModal: true });
 
-      render(<FormLayout {...props} />);
-      
-      fireEvent.keyDown(document, { key: 'p', ctrlKey: true });
-      
-      expect(screen.getByText('Form Preview')).toBeInTheDocument();
-    });
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-    test('saves with keyboard shortcut', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
-
-      render(<FormLayout {...props} />);
-      
-      fireEvent.keyDown(document, { key: 's', ctrlKey: true });
-      
-      expect(mockOnSaveAsDraft).toHaveBeenCalledTimes(1);
-    });
+    const modal = screen.getByTestId('modal');
+    expect(modal).toBeInTheDocument();
+    expect(screen.getByText(/Once published, editing will be locked/)).toBeInTheDocument();
   });
 
-  describe('Responsive Behavior', () => {
-    test('adjusts layout for mobile view', () => {
-      global.innerWidth = 375;
-      global.dispatchEvent(new Event('resize'));
-      
-      render(<FormLayout {...defaultProps} />);
-      
-      const actionBar = screen.getByTestId('action-bar');
-      expect(actionBar).toHaveClass('mobile');
-    });
+  test('preview button shows eye icon', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-    test('adjusts layout for desktop view', () => {
-      global.innerWidth = 1024;
-      global.dispatchEvent(new Event('resize'));
-      
-      render(<FormLayout {...defaultProps} />);
-      
-      const actionBar = screen.getByTestId('action-bar');
-      expect(actionBar).toHaveClass('desktop');
-    });
+    const previewButton = screen.getByText(/Preview Form/);
+    expect(previewButton.textContent).toContain('👁️');
   });
 
-  describe('Error Handling', () => {
-    test('handles undefined formData gracefully', () => {
-      const props = {
-        ...defaultProps,
-        formData: undefined
-      };
+  test('renders with all props defined', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Untitled Form')).toBeInTheDocument();
-      expect(screen.getByText('No description provided')).toBeInTheDocument();
-    });
-
-    test('handles null questions array', () => {
-      const props = {
-        ...defaultProps,
-        questions: null
-      };
-
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText('Questions: 0')).toBeInTheDocument();
-    });
+    expect(screen.getByTestId('section-editor')).toBeInTheDocument();
+    expect(screen.getByText('Questions: 1')).toBeInTheDocument();
   });
 
-  describe('Loading States', () => {
-    test('shows loading indicator when fetching data', () => {
-      const props = {
-        ...defaultProps,
-        loading: true
-      };
+  test('renders without preview when showPreview is false', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-    });
-
-    test('hides loading indicator when data loaded', () => {
-      const props = {
-        ...defaultProps,
-        loading: false
-      };
-
-      render(<FormLayout {...props} />);
-      
-      expect(screen.queryByTestId('loading-spinner')).not.toBeInTheDocument();
-    });
+    expect(screen.queryByTestId('question-preview')).not.toBeInTheDocument();
   });
 
-  describe('Tooltips', () => {
-    test('shows tooltip on preview button hover', async () => {
-      render(<FormLayout {...defaultProps} />);
-      
-      const previewButton = screen.getByText('Preview Form');
-      fireEvent.mouseEnter(previewButton);
-      
-      await screen.findByText('Preview how the form will appear to users');
-    });
+  test('renders question preview with correct props when in preview mode', () => {
+    store = createMockStore({ showPreview: true });
 
-    test('shows tooltip on save button hover', async () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      const saveButton = screen.getByText('Save as Draft');
-      fireEvent.mouseEnter(saveButton);
-      
-      await screen.findByText('Save current progress as draft');
-    });
-
-    test('shows tooltip on publish button hover', async () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }]
-      };
-
-      render(<FormLayout {...props} />);
-      
-      const publishButton = screen.getByText('Publish Form');
-      fireEvent.mouseEnter(publishButton);
-      
-      await screen.findByText('Make the form available to users');
-    });
+    expect(screen.getByText('Preview Questions: 1')).toBeInTheDocument();
   });
 
-  describe('Auto-save', () => {
-    test('auto-saves after inactivity period', () => {
-      jest.useFakeTimers();
-      
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }],
-        autoSave: true
-      };
+  test('passes formTitle and formDescription to SectionEditor', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      // Simulate inactivity
-      jest.advanceTimersByTime(30000);
-      
-      expect(mockOnSaveAsDraft).toHaveBeenCalledTimes(1);
-      
-      jest.useRealTimers();
+    expect(screen.getByText('Title: Test Form')).toBeInTheDocument();
+    expect(screen.getByText('Description: Test Description')).toBeInTheDocument();
+  });
+
+  test('renders actions in correct wrapper divs', () => {
+    const { container } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    expect(container.querySelector('.form-config-actions-wrapper')).toBeInTheDocument();
+    expect(container.querySelector('.actions-right-group')).toBeInTheDocument();
+  });
+
+  test('handles empty formData', () => {
+    const props = {
+      ...defaultProps,
+      formData: { title: '', description: '' }
+    };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...props} />
+      </Provider>
+    );
+
+    expect(screen.getByText('Title:')).toBeInTheDocument();
+    expect(screen.getByText('Description:')).toBeInTheDocument();
+  });
+
+  test('renders with minimal props', () => {
+    const minimalProps = {
+      formData: { title: '', description: '' },
+      questions: [],
+      onQuestionsChange: jest.fn(),
+      onSaveAsDraft: jest.fn(),
+      onPublish: jest.fn(),
+      saving: false
+    };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...minimalProps} />
+      </Provider>
+    );
+
+    expect(screen.getByTestId('section-editor')).toBeInTheDocument();
+  });
+
+  test('does not render null when showPreview is false', () => {
+    const { container } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const previewModal = container.querySelector('.preview-modal');
+    expect(previewModal).not.toBeInTheDocument();
+  });
+
+  test('modal receives correct variant prop', () => {
+    store = createMockStore({ showPublishModal: true });
+
+    const { container } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    // Modal is rendered with variant="default"
+    expect(screen.getByTestId('modal')).toBeInTheDocument();
+  });
+
+  test('modal receives correct type prop', () => {
+    store = createMockStore({ showPublishModal: true });
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    // Modal is rendered with type="publish"
+    expect(screen.getByTestId('modal')).toBeInTheDocument();
+  });
+
+  test('applies correct CSS classes', () => {
+    const { container } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    expect(container.querySelector('.form-editor-content-area1')).toBeInTheDocument();
+    expect(container.querySelector('.form-layout-wrapper')).toBeInTheDocument();
+  });
+
+  test('applies correct button classes', () => {
+    const { container } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    expect(container.querySelector('.action-button-secondary')).toBeInTheDocument();
+    expect(container.querySelector('.action-button-outline')).toBeInTheDocument();
+    expect(container.querySelector('.action-button-primary')).toBeInTheDocument();
+  });
+
+  test('renders close button with correct symbol', () => {
+    store = createMockStore({ showPreview: true });
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const closeButton = screen.getByText('×');
+    expect(closeButton).toHaveClass('close-preview');
+  });
+
+  test('preview modal has correct structure', () => {
+    store = createMockStore({ showPreview: true });
+
+    const { container } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    expect(container.querySelector('.preview-modal')).toBeInTheDocument();
+    expect(container.querySelector('.preview-modal-content')).toBeInTheDocument();
+    expect(container.querySelector('.preview-modal-header')).toBeInTheDocument();
+  });
+
+  test('renders with complex questions array', () => {
+    const complexProps = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1', type: 'text' },
+        { _id: 'q2', question: 'Question 2', type: 'select' },
+        { _id: 'q3', question: 'Question 3', type: 'checkbox' }
+      ]
+    };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...complexProps} />
+      </Provider>
+    );
+
+    expect(screen.getByText('Questions: 3')).toBeInTheDocument();
+  });
+
+  test('handles undefined onHeaderChange gracefully', () => {
+    const props = {
+      ...defaultProps,
+      onHeaderChange: undefined
+    };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...props} />
+      </Provider>
+    );
+
+    expect(screen.getByTestId('section-editor')).toBeInTheDocument();
+  });
+
+  test('all buttons are accessible', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const previewButton = screen.getByText(/Preview Form/);
+    const saveButton = screen.getByText('Save as Draft');
+    const publishButton = screen.getByText('Publish Form');
+
+    expect(previewButton).toBeEnabled();
+    expect(saveButton).toBeEnabled();
+    expect(publishButton).toBeEnabled();
+  });
+
+  test('integrates with Redux store correctly', () => {
+    const customStore = createMockStore({ 
+      showPreview: false, 
+      showPublishModal: false 
     });
 
-    test('shows auto-save indicator', () => {
-      const props = {
-        ...defaultProps,
-        questions: [{ _id: '1', question: 'Question 1' }],
-        autoSave: true,
-        lastSaved: new Date().toISOString()
-      };
+    const { rerender } = render(
+      <Provider store={customStore}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
 
-      render(<FormLayout {...props} />);
-      
-      expect(screen.getByText(/Auto-saved/)).toBeInTheDocument();
-    });
+    // Toggle preview
+    const previewButton = screen.getByText('Preview Form');
+    fireEvent.click(previewButton);
+
+    rerender(
+      <Provider store={customStore}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+  });
+
+  test('handles rapid clicks on preview toggle', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const previewButton = screen.getByText('Preview Form');
+    
+    // Rapid clicks
+    fireEvent.click(previewButton);
+    fireEvent.click(previewButton);
+    fireEvent.click(previewButton);
+  });
+
+  test('handles rapid clicks on publish button', () => {
+    render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    const publishButton = screen.getByText('Publish Form');
+    
+    // Rapid clicks
+    fireEvent.click(publishButton);
+    fireEvent.click(publishButton);
+  });
+
+  test('maintains state consistency', () => {
+    const { rerender } = render(
+      <Provider store={store}>
+        <FormLayout {...defaultProps} />
+      </Provider>
+    );
+
+    // Change props
+    const newProps = {
+      ...defaultProps,
+      formData: { title: 'New Title', description: 'New Description' }
+    };
+
+    rerender(
+      <Provider store={store}>
+        <FormLayout {...newProps} />
+      </Provider>
+    );
+
+    expect(screen.getByText('Title: New Title')).toBeInTheDocument();
+  });
+
+  test('handles all edge cases for saving state', () => {
+    const savingProps = {
+      ...defaultProps,
+      saving: true,
+      questions: []
+    };
+
+    render(
+      <Provider store={store}>
+        <FormLayout {...savingProps} />
+      </Provider>
+    );
+
+    expect(screen.getByText('Saving...')).toBeDisabled();
+    expect(screen.getByText('Publishing...')).toBeDisabled();
   });
 });

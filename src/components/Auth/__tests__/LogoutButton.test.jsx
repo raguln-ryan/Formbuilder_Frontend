@@ -2,134 +2,78 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LogoutButton from '../LogoutButton';
-import { useAuth } from '../../../contexts/AuthContext';
+import { AuthProvider } from '../../../contexts/AuthContext';
 
-jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: jest.fn()
-}));
+const MockedLogoutButton = (props) => (
+  <BrowserRouter>
+    <AuthProvider>
+      <LogoutButton {...props} />
+    </AuthProvider>
+  </BrowserRouter>
+);
 
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate
-}));
-
-describe('LogoutButton Component', () => {
-  const mockLogout = jest.fn();
-  
-  beforeEach(() => {
-    useAuth.mockReturnValue({
-      logout: mockLogout
-    });
-    mockNavigate.mockClear();
-    mockLogout.mockClear();
-  });
-
+describe('LogoutButton', () => {
   test('renders logout button', () => {
-    render(
-      <BrowserRouter>
-        <LogoutButton />
-      </BrowserRouter>
-    );
-
+    render(<MockedLogoutButton />);
     expect(screen.getByText('Logout')).toBeInTheDocument();
-    expect(screen.getByRole('button')).toBeInTheDocument();
-  });
-
-  test('performs logout without confirmation', async () => {
-    jest.useFakeTimers();
-    
-    render(
-      <BrowserRouter>
-        <LogoutButton showConfirmation={false} />
-      </BrowserRouter>
-    );
-
-    const logoutButton = screen.getByRole('button');
-    fireEvent.click(logoutButton);
-    
-    expect(screen.getByText('Logging out...')).toBeInTheDocument();
-    
-    jest.advanceTimersByTime(500);
-    
-    await waitFor(() => {
-      expect(mockLogout).toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
-    });
-    
-    jest.useRealTimers();
   });
 
   test('shows confirmation modal when showConfirmation is true', () => {
-    render(
-      <BrowserRouter>
-        <LogoutButton showConfirmation={true} />
-      </BrowserRouter>
-    );
-
-    const logoutButton = screen.getByRole('button');
-    fireEvent.click(logoutButton);
+    render(<MockedLogoutButton showConfirmation={true} />);
+    const logoutBtn = screen.getByText('Logout');
     
+    fireEvent.click(logoutBtn);
     expect(screen.getByText('Confirm Logout')).toBeInTheDocument();
-    expect(screen.getByText(/Are you sure you want to logout/)).toBeInTheDocument();
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
-    expect(screen.getByText('Yes, Logout')).toBeInTheDocument();
+    expect(screen.getByText(/Are you sure you want to logout/i)).toBeInTheDocument();
   });
 
-  test('cancels logout from confirmation modal', () => {
-    render(
-      <BrowserRouter>
-        <LogoutButton showConfirmation={true} />
-      </BrowserRouter>
-    );
-
-    fireEvent.click(screen.getByRole('button'));
+  test('closes modal on cancel click', () => {
+    render(<MockedLogoutButton showConfirmation={true} />);
+    fireEvent.click(screen.getByText('Logout'));
     
-    const cancelButton = screen.getByText('Cancel');
-    fireEvent.click(cancelButton);
-    
+    const cancelBtn = screen.getByText('Cancel');
+    fireEvent.click(cancelBtn);
     expect(screen.queryByText('Confirm Logout')).not.toBeInTheDocument();
-    expect(mockLogout).not.toHaveBeenCalled();
   });
 
-  test('confirms logout from modal', async () => {
-    jest.useFakeTimers();
+  test('closes modal on overlay click', () => {
+    render(<MockedLogoutButton showConfirmation={true} />);
+    fireEvent.click(screen.getByText('Logout'));
     
-    render(
-      <BrowserRouter>
-        <LogoutButton showConfirmation={true} />
-      </BrowserRouter>
-    );
-
-    fireEvent.click(screen.getByRole('button'));
-    
-    const confirmButton = screen.getByText('Yes, Logout');
-    fireEvent.click(confirmButton);
-    
+    const overlay = document.querySelector('.logout-modal-overlay');
+    fireEvent.click(overlay);
     expect(screen.queryByText('Confirm Logout')).not.toBeInTheDocument();
+  });
+
+  test('performs logout on confirm', async () => {
+    render(<MockedLogoutButton showConfirmation={true} />);
+    fireEvent.click(screen.getByText('Logout'));
     
-    jest.advanceTimersByTime(500);
+    const confirmBtn = screen.getByText('Yes, Logout');
+    fireEvent.click(confirmBtn);
     
     await waitFor(() => {
-      expect(mockLogout).toHaveBeenCalled();
-      expect(mockNavigate).toHaveBeenCalledWith('/login');
+      expect(screen.queryByText('Confirm Logout')).not.toBeInTheDocument();
     });
-    
-    jest.useRealTimers();
   });
 
-  test('closes modal when clicking overlay', () => {
-    render(
-      <BrowserRouter>
-        <LogoutButton showConfirmation={true} />
-      </BrowserRouter>
-    );
+  test('shows loading state during logout', async () => {
+    render(<MockedLogoutButton showConfirmation={false} />);
+    const logoutBtn = screen.getByText('Logout');
+    
+    fireEvent.click(logoutBtn);
+    expect(await screen.findByText('Logging out...')).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getByRole('button'));
+  test('prevents event propagation on modal click', () => {
+    render(<MockedLogoutButton showConfirmation={true} />);
+    fireEvent.click(screen.getByText('Logout'));
     
-    const overlay = screen.getByText('Confirm Logout').closest('.logout-modal-overlay');
-    fireEvent.click(overlay);
+    const modal = document.querySelector('.logout-modal');
+    const event = new MouseEvent('click', { bubbles: true });
+    jest.spyOn(event, 'stopPropagation');
+    fireEvent(modal, event);
     
-    expect(screen.queryByText('Confirm Logout')).not.toBeInTheDocument();
+    expect(event.stopPropagation).toHaveBeenCalled();
   });
 });

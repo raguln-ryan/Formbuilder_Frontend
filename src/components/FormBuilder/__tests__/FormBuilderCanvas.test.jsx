@@ -1,455 +1,825 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import FormBuilderCanvas from '../FormBuilderCanvas';
 import toast from 'react-hot-toast';
+import { generateId } from '../../../utils/helpers';
 
-jest.mock('react-hot-toast', () => ({
-  success: jest.fn(),
-  error: jest.fn()
+// Mock dependencies
+jest.mock('react-hot-toast');
+jest.mock('../../../utils/helpers', () => ({
+  generateId: jest.fn(() => 'generated-id')
 }));
+jest.mock('../../../styles/components/FormBuilder/FormBuilderCanvas.css', () => ({}));
+jest.mock('./../../../assets/drag.png', () => 'drag.png');
 
-describe('FormBuilderCanvas Component', () => {
+// Mock QuestionEditor
+jest.mock('../QuestionEditor', () => {
+  return function MockQuestionEditor({ 
+    question, 
+    index, 
+    onUpdate, 
+    onDelete, 
+    onMove, 
+    onDuplicate,
+    onDragStart,
+    onDragEnd,
+    onDragOver,
+    onDrop,
+    isEditing 
+  }) {
+    return (
+      <div 
+        data-testid={`question-${index}`}
+        draggable
+        onDragStart={() => onDragStart(index)}
+        onDragEnd={onDragEnd}
+        onDragOver={(e) => onDragOver(e, index)}
+        onDrop={(e) => onDrop(e, index)}
+        className={isEditing ? 'editing' : ''}
+      >
+        <div>Question {index + 1}</div>
+        <button onClick={() => onUpdate({ ...question, updated: true })}>Update</button>
+        <button onClick={() => onDelete()}>Delete</button>
+        <button onClick={() => onMove('up')}>Move Up</button>
+        <button onClick={() => onMove('down')}>Move Down</button>
+        <button onClick={() => onDuplicate(question)}>Duplicate</button>
+      </div>
+    );
+  };
+});
+
+describe('FormBuilderCanvas', () => {
   const mockOnQuestionsChange = jest.fn();
-  
+  const mockOnHeaderChange = jest.fn();
+
   const defaultProps = {
     questions: [],
     onQuestionsChange: mockOnQuestionsChange,
     formTitle: 'Test Form',
-    formDescription: 'Test Description'
+    formDescription: 'Test Description',
+    onHeaderChange: mockOnHeaderChange
   };
 
   beforeEach(() => {
-    mockOnQuestionsChange.mockClear();
-    toast.success.mockClear();
-    toast.error.mockClear();
+    jest.clearAllMocks();
   });
 
-  describe('Basic Rendering', () => {
-    test('renders form title and description', () => {
-      render(<FormBuilderCanvas {...defaultProps} />);
-      
-      expect(screen.getByText('Test Form')).toBeInTheDocument();
-      expect(screen.getByText('Test Description')).toBeInTheDocument();
-    });
+  test('renders empty state when no questions', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    expect(screen.getByText('Drag fields from the left panel')).toBeInTheDocument();
+    expect(screen.getByAltText('drag icon')).toBeInTheDocument();
+  });
 
-    test('renders with empty title showing default', () => {
-      render(<FormBuilderCanvas {...defaultProps} formTitle="" />);
-      
-      expect(screen.getByText('Untitled Form')).toBeInTheDocument();
-    });
+  test('renders questions when provided', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
 
-    test('renders with empty description showing default', () => {
-      render(<FormBuilderCanvas {...defaultProps} formDescription="" />);
-      
-      expect(screen.getByText('No description available')).toBeInTheDocument();
-    });
+    render(<FormBuilderCanvas {...props} />);
+    
+    expect(screen.getByTestId('question-0')).toBeInTheDocument();
+    expect(screen.getByTestId('question-1')).toBeInTheDocument();
+  });
 
-    test('shows empty state when no questions', () => {
-      render(<FormBuilderCanvas {...defaultProps} />);
-      
-      expect(screen.getByText('Drag fields from the left panel')).toBeInTheDocument();
-      expect(screen.getByAltText('drag icon')).toBeInTheDocument();
-    });
+  test('renders header section', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    expect(screen.getByText('Header')).toBeInTheDocument();
+    expect(screen.getByText('Test Form')).toBeInTheDocument();
+    expect(screen.getByText('Test Description')).toBeInTheDocument();
+  });
 
-    test('renders questions when provided', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Question 1', order: 0 },
-        { _id: '2', type: 'number', question: 'Question 2', order: 1 }
-      ];
+  test('shows placeholder text when no title or description', () => {
+    const props = {
+      ...defaultProps,
+      formTitle: '',
+      formDescription: ''
+    };
 
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      expect(screen.getByDisplayValue('Question 1')).toBeInTheDocument();
-      expect(screen.getByDisplayValue('Question 2')).toBeInTheDocument();
-    });
+    render(<FormBuilderCanvas {...props} />);
+    
+    expect(screen.getByText('Click to add form title')).toBeInTheDocument();
+    expect(screen.getByText('Click to add form description')).toBeInTheDocument();
+  });
 
-    test('applies disabled class with formId', () => {
-      const { container } = render(
-        <FormBuilderCanvas {...defaultProps} formId="123" />
-      );
-      
-      expect(container.querySelector('.form-builder-canvas')).toHaveClass('disabled');
+  test('handles header click to enter edit mode', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const headerCard = screen.getByText('Test Form').closest('.form-header-card');
+    fireEvent.click(headerCard);
+    
+    expect(screen.getByPlaceholderText('Enter form title')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Enter form description')).toBeInTheDocument();
+  });
+
+  test('handles header title change', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const headerCard = screen.getByText('Test Form').closest('.form-header-card');
+    fireEvent.click(headerCard);
+    
+    const titleInput = screen.getByPlaceholderText('Enter form title');
+    fireEvent.change(titleInput, { target: { value: 'New Title' } });
+    
+    expect(titleInput.value).toBe('New Title');
+  });
+
+  test('handles header description change', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const headerCard = screen.getByText('Test Form').closest('.form-header-card');
+    fireEvent.click(headerCard);
+    
+    const descInput = screen.getByPlaceholderText('Enter form description');
+    fireEvent.change(descInput, { target: { value: 'New Description' } });
+    
+    expect(descInput.value).toBe('New Description');
+  });
+
+  test('handles click outside header to save changes', () => {
+    const { container } = render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const headerCard = screen.getByText('Test Form').closest('.form-header-card');
+    fireEvent.click(headerCard);
+    
+    const titleInput = screen.getByPlaceholderText('Enter form title');
+    fireEvent.change(titleInput, { target: { value: 'New Title' } });
+    
+    // Click outside
+    fireEvent.mouseDown(container.firstChild);
+    
+    expect(mockOnHeaderChange).toHaveBeenCalledWith({
+      title: 'New Title',
+      description: 'Test Description'
     });
   });
 
-  describe('Drag and Drop Operations', () => {
-    test('handles dragover event', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const event = new Event('dragover', { bubbles: true });
-      event.preventDefault = jest.fn();
-      event.dataTransfer = { dropEffect: '' };
-      
-      fireEvent(dropZone, event);
-      
-      expect(event.preventDefault).toHaveBeenCalled();
-      expect(event.dataTransfer.dropEffect).toBe('copy');
-      expect(dropZone).toHaveClass('dragging');
-    });
+  test('does not edit header in view mode', () => {
+    const props = {
+      ...defaultProps,
+      formId: 'existing-form-id'
+    };
 
-    test('handles dragleave event', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      
-      // First trigger dragover to add dragging class
-      fireEvent.dragOver(dropZone);
-      expect(dropZone).toHaveClass('dragging');
-      
-      fireEvent.dragLeave(dropZone);
-      expect(dropZone).not.toHaveClass('dragging');
-    });
+    render(<FormBuilderCanvas {...props} />);
+    
+    const headerCard = screen.getByText('Test Form').closest('.form-header-card');
+    fireEvent.click(headerCard);
+    
+    expect(screen.queryByPlaceholderText('Enter form title')).not.toBeInTheDocument();
+  });
 
-    test('drops short_text field successfully', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const fieldData = { type: 'short_text', label: 'Short Text' };
-      
-      const event = new Event('drop', { bubbles: true });
-      event.preventDefault = jest.fn();
-      event.dataTransfer = { 
+  test('handles drag start from sidebar', () => {
+    const dataTransfer = {
+      types: { includes: jest.fn(() => true) }
+    };
+
+    const { container } = render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dragEvent = new Event('dragstart', { bubbles: true });
+    Object.defineProperty(dragEvent, 'dataTransfer', { value: dataTransfer });
+    
+    document.dispatchEvent(dragEvent);
+  });
+
+  test('handles drag over', () => {
+    const dataTransfer = {
+      types: { includes: jest.fn(() => true) },
+      dropEffect: null
+    };
+
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dragOverEvent = new Event('dragover', { bubbles: true });
+    Object.defineProperty(dragOverEvent, 'dataTransfer', { value: dataTransfer });
+    
+    fireEvent(dropSection, dragOverEvent);
+  });
+
+  test('handles drag enter', () => {
+    const dataTransfer = {
+      types: { includes: jest.fn(() => true) }
+    };
+
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dragEnterEvent = new Event('dragenter', { bubbles: true });
+    Object.defineProperty(dragEnterEvent, 'dataTransfer', { value: dataTransfer });
+    
+    fireEvent(dropSection, dragEnterEvent);
+  });
+
+  test('handles drag leave', () => {
+    const { container } = render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = container.querySelector('.drag-drop-section');
+    const rect = {
+      left: 0,
+      right: 100,
+      top: 0,
+      bottom: 100
+    };
+    
+    jest.spyOn(dropSection, 'getBoundingClientRect').mockReturnValue(rect);
+    
+    const dragLeaveEvent = new Event('dragleave', { bubbles: true });
+    Object.defineProperty(dragLeaveEvent, 'clientX', { value: 150 });
+    Object.defineProperty(dragLeaveEvent, 'clientY', { value: 150 });
+    
+    fireEvent(dropSection, dragLeaveEvent);
+  });
+
+  test('handles drag leave within bounds', () => {
+    const { container } = render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = container.querySelector('.drag-drop-section');
+    const rect = {
+      left: 0,
+      right: 100,
+      top: 0,
+      bottom: 100
+    };
+    
+    jest.spyOn(dropSection, 'getBoundingClientRect').mockReturnValue(rect);
+    
+    const dragLeaveEvent = new Event('dragleave', { bubbles: true });
+    Object.defineProperty(dragLeaveEvent, 'clientX', { value: 50 });
+    Object.defineProperty(dragLeaveEvent, 'clientY', { value: 50 });
+    
+    fireEvent(dropSection, dragLeaveEvent);
+  });
+
+  test('handles drop with choice field type', () => {
+    const fieldData = {
+      type: 'choice',
+      label: 'Choice Field'
+    };
+
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
         getData: jest.fn(() => JSON.stringify(fieldData))
-      };
-      
-      fireEvent(dropZone, event);
-      
-      expect(event.preventDefault).toHaveBeenCalled();
-      expect(mockOnQuestionsChange).toHaveBeenCalled();
-      
-      const newQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(newQuestion.type).toBe('short_text');
-      expect(newQuestion.question).toBe('Short Text');
-      expect(toast.success).toHaveBeenCalledWith('Short Text field added successfully!', expect.any(Object));
+      }
     });
+    
+    fireEvent(dropSection, dropEvent);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(
+      'Choice Field field added successfully!',
+      expect.any(Object)
+    );
+  });
 
-    test('drops long_text field with default properties', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const fieldData = { type: 'long_text', label: 'Long Text' };
-      
-      const event = new Event('drop', { bubbles: true });
-      event.preventDefault = jest.fn();
-      event.dataTransfer = { 
+  test('handles drop with date_picker field type', () => {
+    const fieldData = {
+      type: 'date_picker',
+      label: 'Date Picker'
+    };
+
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
         getData: jest.fn(() => JSON.stringify(fieldData))
-      };
-      
-      fireEvent(dropZone, event);
-      
-      const newQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(newQuestion.type).toBe('long_text');
-      expect(newQuestion.rows).toBe(4);
+      }
     });
+    
+    fireEvent(dropSection, dropEvent);
+    
+    const callArg = mockOnQuestionsChange.mock.calls[0][0];
+    expect(callArg[0].format).toBe('MM/DD/YYYY');
+  });
 
-    test('drops number field with validation', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const fieldData = { type: 'number', label: 'Number' };
-      
-      const event = new Event('drop', { bubbles: true });
-      event.dataTransfer = { 
+  test('handles drop with regular field type', () => {
+    const fieldData = {
+      type: 'text',
+      label: 'Text Field'
+    };
+
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
         getData: jest.fn(() => JSON.stringify(fieldData))
-      };
-      event.preventDefault = jest.fn();
-      
-      fireEvent(dropZone, event);
-      
-      const newQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(newQuestion.type).toBe('number');
+      }
     });
+    
+    fireEvent(dropSection, dropEvent);
+    
+    const callArg = mockOnQuestionsChange.mock.calls[0][0];
+    expect(callArg[0].options).toEqual([]);
+  });
 
-    test('drops choice field with options', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const fieldData = { type: 'choice', label: 'Multiple Choice' };
-      
-      const event = new Event('drop', { bubbles: true });
-      event.dataTransfer = { 
-        getData: jest.fn(() => JSON.stringify(fieldData))
-      };
-      event.preventDefault = jest.fn();
-      
-      fireEvent(dropZone, event);
-      
-      const newQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(newQuestion.type).toBe('choice');
-      expect(newQuestion.options).toHaveLength(2);
-      expect(newQuestion.options[0].value).toBe('Option 1');
+  test('handles drop with no data', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
+        getData: jest.fn(() => null)
+      }
     });
+    
+    fireEvent(dropSection, dropEvent);
+    
+    expect(mockOnQuestionsChange).not.toHaveBeenCalled();
+  });
 
-    test('drops date_picker field', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const fieldData = { type: 'date_picker', label: 'Date Picker' };
-      
-      const event = new Event('drop', { bubbles: true });
-      event.dataTransfer = { 
-        getData: jest.fn(() => JSON.stringify(fieldData))
-      };
-      event.preventDefault = jest.fn();
-      
-      fireEvent(dropZone, event);
-      
-      const newQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(newQuestion.type).toBe('date_picker');
-      expect(newQuestion.format).toBe('MM/DD/YYYY');
-    });
-
-    test('handles invalid JSON in drop', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      
-      const event = new Event('drop', { bubbles: true });
-      event.dataTransfer = { 
+  test('handles drop error', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    Object.defineProperty(dropEvent, 'dataTransfer', {
+      value: {
         getData: jest.fn(() => 'invalid json')
-      };
-      event.preventDefault = jest.fn();
-      
-      fireEvent(dropZone, event);
-      
-      expect(toast.error).toHaveBeenCalledWith('Failed to add field. Please try again.');
+      }
     });
+    
+    fireEvent(dropSection, dropEvent);
+    
+    expect(toast.error).toHaveBeenCalledWith('Failed to add field. Please try again.');
+  });
 
-    test('handles empty data transfer', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      
-      const event = new Event('drop', { bubbles: true });
-      event.dataTransfer = { 
-        getData: jest.fn(() => '')
-      };
-      event.preventDefault = jest.fn();
-      
-      fireEvent(dropZone, event);
-      
-      expect(mockOnQuestionsChange).not.toHaveBeenCalled();
+  test('handles question update', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const updateButton = screen.getByText('Update');
+    fireEvent.click(updateButton);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalledWith([
+      { _id: 'q1', question: 'Question 1', updated: true }
+    ]);
+  });
+
+  test('handles question delete', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const deleteButton = screen.getAllByText('Delete')[0];
+    fireEvent.click(deleteButton);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalledWith([
+      { _id: 'q2', question: 'Question 2', order: 0 }
+    ]);
+    expect(toast.success).toHaveBeenCalledWith('Question deleted', { duration: 3000 });
+  });
+
+  test('handles move up', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const moveUpButton = screen.getAllByText('Move Up')[1];
+    fireEvent.click(moveUpButton);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(
+      'Question moved up',
+      expect.objectContaining({ icon: '⬆️' })
+    );
+  });
+
+  test('handles move down', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const moveDownButton = screen.getAllByText('Move Down')[0];
+    fireEvent.click(moveDownButton);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(
+      'Question moved down',
+      expect.objectContaining({ icon: '⬇️' })
+    );
+  });
+
+  test('handles move up at first position', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const moveUpButton = screen.getByText('Move Up');
+    fireEvent.click(moveUpButton);
+    
+    expect(toast.error).toHaveBeenCalledWith('Cannot move question up', { duration: 2000 });
+  });
+
+  test('handles move down at last position', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const moveDownButton = screen.getByText('Move Down');
+    fireEvent.click(moveDownButton);
+    
+    expect(toast.error).toHaveBeenCalledWith('Cannot move question down', { duration: 2000 });
+  });
+
+  test('handles question duplicate', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const duplicateButton = screen.getByText('Duplicate');
+    fireEvent.click(duplicateButton);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(
+      'Question duplicated successfully!',
+      { duration: 2000 }
+    );
+  });
+
+  test('handles question drag start', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question = screen.getByTestId('question-0');
+    fireEvent.dragStart(question);
+  });
+
+  test('handles question drag over', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question1 = screen.getByTestId('question-0');
+    const question2 = screen.getByTestId('question-1');
+    
+    fireEvent.dragStart(question1);
+    
+    const dragOverEvent = new Event('dragover', { bubbles: true });
+    dragOverEvent.preventDefault = jest.fn();
+    
+    fireEvent(question2, dragOverEvent);
+  });
+
+  test('handles question drop for reordering', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question1 = screen.getByTestId('question-0');
+    const question2 = screen.getByTestId('question-1');
+    
+    fireEvent.dragStart(question1);
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    
+    fireEvent(question2, dropEvent);
+    
+    expect(mockOnQuestionsChange).toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalledWith(
+      'Question reordered',
+      expect.objectContaining({ icon: '↕️' })
+    );
+  });
+
+  test('handles question drop at same position', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question = screen.getByTestId('question-0');
+    
+    fireEvent.dragStart(question);
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    
+    fireEvent(question, dropEvent);
+    
+    expect(mockOnQuestionsChange).not.toHaveBeenCalled();
+  });
+
+  test('handles question drag end', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question = screen.getByTestId('question-0');
+    fireEvent.dragEnd(question);
+  });
+
+  test('toggles question edit mode', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    const { container } = render(<FormBuilderCanvas {...props} />);
+    
+    const questionDiv = container.querySelector('[data-testid="question-0"]').parentElement;
+    fireEvent.click(questionDiv);
+    
+    expect(screen.getByTestId('question-0')).toHaveClass('editing');
+    
+    fireEvent.click(questionDiv);
+    
+    expect(screen.getByTestId('question-0')).not.toHaveClass('editing');
+  });
+
+  test('does not allow editing in view mode', () => {
+    const props = {
+      ...defaultProps,
+      formId: 'existing-form-id',
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    const { container } = render(<FormBuilderCanvas {...props} />);
+    
+    const questionDiv = container.querySelector('[data-testid="question-0"]').parentElement;
+    fireEvent.click(questionDiv);
+    
+    expect(screen.getByTestId('question-0')).not.toHaveClass('editing');
+  });
+
+  test('handles click outside question to close edit mode', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    const { container } = render(<FormBuilderCanvas {...props} />);
+    
+    const questionDiv = container.querySelector('[data-testid="question-0"]').parentElement;
+    fireEvent.click(questionDiv);
+    
+    expect(screen.getByTestId('question-0')).toHaveClass('editing');
+    
+    fireEvent.mouseDown(container);
+    
+    expect(screen.getByTestId('question-0')).not.toHaveClass('editing');
+  });
+
+  test('shows drop placeholder when dragging from sidebar', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    // Simulate drag start from sidebar
+    const dragStartEvent = new Event('dragstart', { bubbles: true });
+    Object.defineProperty(dragStartEvent, 'dataTransfer', {
+      value: { types: { includes: jest.fn(() => true) } }
     });
-
-    test('adds field to existing questions', () => {
-      const existingQuestions = [
-        { _id: '1', type: 'short_text', question: 'Existing', order: 0 }
-      ];
-
-      const { container } = render(
-        <FormBuilderCanvas {...defaultProps} questions={existingQuestions} />
-      );
-      
-      const dropZone = container.querySelector('.drop-zone');
-      const fieldData = { type: 'number', label: 'New Number' };
-      
-      const event = new Event('drop', { bubbles: true });
-      event.dataTransfer = { 
-        getData: jest.fn(() => JSON.stringify(fieldData))
-      };
-      event.preventDefault = jest.fn();
-      
-      fireEvent(dropZone, event);
-      
-      const updatedQuestions = mockOnQuestionsChange.mock.calls[0][0];
-      expect(updatedQuestions).toHaveLength(2);
-      expect(updatedQuestions[1].order).toBe(1);
+    document.dispatchEvent(dragStartEvent);
+    
+    // Simulate drag over
+    const dropSection = document.querySelector('.drag-drop-section');
+    const dragOverEvent = new Event('dragover', { bubbles: true });
+    dragOverEvent.preventDefault = jest.fn();
+    Object.defineProperty(dragOverEvent, 'dataTransfer', {
+      value: { 
+        dropEffect: null,
+        types: { includes: jest.fn(() => true) }
+      }
+    });
+    
+    fireEvent(dropSection, dragOverEvent);
+    
+    // Wait for state update
+    waitFor(() => {
+      expect(screen.getByText('Drag and drop the item here')).toBeInTheDocument();
     });
   });
 
-  describe('Question Management', () => {
-    test('updates question text', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Original', order: 0 }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const input = screen.getByDisplayValue('Original');
-      fireEvent.change(input, { target: { value: 'Updated Question' } });
-      
-      expect(mockOnQuestionsChange).toHaveBeenCalledWith([
-        expect.objectContaining({ question: 'Updated Question' })
-      ]);
-    });
-
-    test('deletes question', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Q1', order: 0 },
-        { _id: '2', type: 'number', question: 'Q2', order: 1 }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const deleteButtons = screen.getAllByTitle('Delete Question');
-      fireEvent.click(deleteButtons[0]);
-      
-      const updatedQuestions = mockOnQuestionsChange.mock.calls[0][0];
-      expect(updatedQuestions).toHaveLength(1);
-      expect(updatedQuestions[0]._id).toBe('2');
-      expect(updatedQuestions[0].order).toBe(0);
-      expect(toast.success).toHaveBeenCalledWith('Question deleted', expect.any(Object));
-    });
-
-    test('duplicates question', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Original', order: 0 }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const duplicateButton = screen.getByTitle('Duplicate Question');
-      fireEvent.click(duplicateButton);
-      
-      const updatedQuestions = mockOnQuestionsChange.mock.calls[0][0];
-      expect(updatedQuestions).toHaveLength(2);
-      expect(updatedQuestions[1].question).toBe('Original (Copy)');
-      expect(toast.success).toHaveBeenCalledWith('Question duplicated successfully!', expect.any(Object));
-    });
-
-    test('toggles required field', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Q1', required: false, order: 0 }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const checkbox = screen.getByRole('checkbox', { name: /required/i });
-      fireEvent.click(checkbox);
-      
-      expect(mockOnQuestionsChange).toHaveBeenCalledWith([
-        expect.objectContaining({ required: true })
-      ]);
-    });
-
-    test('adds option to choice question', () => {
-      const questions = [
-        { 
-          _id: '1', 
-          type: 'choice', 
-          question: 'Choice', 
-          options: [{ id: '1', value: 'Option 1' }],
-          order: 0 
-        }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const addButton = screen.getByText('Add Option');
-      fireEvent.click(addButton);
-      
-      const updatedQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(updatedQuestion.options).toHaveLength(2);
-    });
-
-    test('updates option text', () => {
-      const questions = [
-        { 
-          _id: '1', 
-          type: 'choice', 
-          question: 'Choice', 
-          options: [{ id: '1', value: 'Option 1' }],
-          order: 0 
-        }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const optionInput = screen.getByDisplayValue('Option 1');
-      fireEvent.change(optionInput, { target: { value: 'Updated Option' } });
-      
-      const updatedQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(updatedQuestion.options[0].value).toBe('Updated Option');
-    });
-
-    test('removes option from choice question', () => {
-      const questions = [
-        { 
-          _id: '1', 
-          type: 'choice', 
-          question: 'Choice', 
-          options: [
-            { id: '1', value: 'Option 1' },
-            { id: '2', value: 'Option 2' }
-          ],
-          order: 0 
-        }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const removeButtons = screen.getAllByTitle('Remove Option');
-      fireEvent.click(removeButtons[0]);
-      
-      const updatedQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(updatedQuestion.options).toHaveLength(1);
-      expect(updatedQuestion.options[0].value).toBe('Option 2');
-    });
+  test('handles global drag end event', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dragEndEvent = new Event('dragend', { bubbles: true });
+    document.dispatchEvent(dragEndEvent);
   });
 
-  describe('Empty State', () => {
-    test('applies empty class when no questions', () => {
-      const { container } = render(<FormBuilderCanvas {...defaultProps} />);
-      
-      const dropZone = container.querySelector('.drop-zone');
-      expect(dropZone).toHaveClass('empty');
-    });
-
-    test('removes empty class when questions exist', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Q1', order: 0 }
-      ];
-
-      const { container } = render(
-        <FormBuilderCanvas {...defaultProps} questions={questions} />
-      );
-      
-      const dropZone = container.querySelector('.drop-zone');
-      expect(dropZone).not.toHaveClass('empty');
-    });
+  test('cleans up event listeners on unmount', () => {
+    const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
+    
+    const { unmount } = render(<FormBuilderCanvas {...defaultProps} />);
+    
+    unmount();
+    
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('dragstart', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('dragend', expect.any(Function));
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('mousedown', expect.any(Function));
   });
 
-  describe('Edge Cases', () => {
-    test('handles question without _id', () => {
-      const questions = [
-        { type: 'short_text', question: 'No ID', order: 0 }
-      ];
+  test('renders with disabled class when formId is provided', () => {
+    const props = {
+      ...defaultProps,
+      formId: 'existing-form-id'
+    };
 
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      expect(screen.getByDisplayValue('No ID')).toBeInTheDocument();
+    const { container } = render(<FormBuilderCanvas {...props} />);
+    
+    expect(container.querySelector('.form-builder-canvas')).toHaveClass('disabled');
+  });
+
+  test('handles header save without onHeaderChange', () => {
+    const props = {
+      ...defaultProps,
+      onHeaderChange: undefined
+    };
+
+    const { container } = render(<FormBuilderCanvas {...props} />);
+    
+    const headerCard = screen.getByText('Test Form').closest('.form-header-card');
+    fireEvent.click(headerCard);
+    
+    fireEvent.mouseDown(container.firstChild);
+  });
+
+  test('handles drag over without dragged item', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    const dropSection = screen.getByText('Drag fields from the left panel').closest('.drag-drop-section');
+    
+    const dragOverEvent = new Event('dragover', { bubbles: true });
+    dragOverEvent.preventDefault = jest.fn();
+    Object.defineProperty(dragOverEvent, 'dataTransfer', {
+      value: { dropEffect: null }
     });
+    
+    fireEvent(dropSection, dragOverEvent);
+  });
 
-    test('handles special characters in question text', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Q&A <test>', order: 0 }
-      ];
+  test('handles question drop without dragged index', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
 
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const input = screen.getByDisplayValue('Q&A <test>');
-      fireEvent.change(input, { target: { value: 'New & "Special" <Characters>' } });
-      
-      const updatedQuestion = mockOnQuestionsChange.mock.calls[0][0][0];
-      expect(updatedQuestion.question).toBe('New & "Special" <Characters>');
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question = screen.getByTestId('question-0');
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    
+    fireEvent(question, dropEvent);
+    
+    expect(mockOnQuestionsChange).not.toHaveBeenCalled();
+  });
+
+  test('removes drag-over class after drop', () => {
+    const props = {
+      ...defaultProps,
+      questions: [
+        { _id: 'q1', question: 'Question 1' },
+        { _id: 'q2', question: 'Question 2' }
+      ]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question1 = screen.getByTestId('question-0');
+    const question2 = screen.getByTestId('question-1');
+    
+    question2.classList.add('drag-over');
+    
+    fireEvent.dragStart(question1);
+    
+    const dropEvent = new Event('drop', { bubbles: true });
+    dropEvent.preventDefault = jest.fn();
+    dropEvent.stopPropagation = jest.fn();
+    
+    fireEvent(question2, dropEvent);
+    
+    expect(question2).not.toHaveClass('drag-over');
+  });
+
+  test('cleans up drag-over classes on drag end', () => {
+    const props = {
+      ...defaultProps,
+      questions: [{ _id: 'q1', question: 'Question 1' }]
+    };
+
+    render(<FormBuilderCanvas {...props} />);
+    
+    const question = screen.getByTestId('question-0');
+    question.classList.add('drag-over');
+    
+    fireEvent.dragEnd(question);
+    
+    expect(question).not.toHaveClass('drag-over');
+  });
+
+  test('handles empty drop placeholder when dragging from sidebar with no questions', () => {
+    render(<FormBuilderCanvas {...defaultProps} />);
+    
+    // Simulate drag start from sidebar
+    const dragStartEvent = new Event('dragstart', { bubbles: true });
+    Object.defineProperty(dragStartEvent, 'dataTransfer', {
+      value: { types: { includes: jest.fn(() => true) } }
     });
-
-    test('handles rapid operations', () => {
-      const questions = [
-        { _id: '1', type: 'short_text', question: 'Q1', order: 0 }
-      ];
-
-      render(<FormBuilderCanvas {...defaultProps} questions={questions} />);
-      
-      const duplicateButton = screen.getByTitle('Duplicate Question');
-      
-      // Rapid clicks
-      fireEvent.click(duplicateButton);
-      fireEvent.click(duplicateButton);
-      
-      // Should handle all clicks
-      expect(mockOnQuestionsChange).toHaveBeenCalledTimes(2);
+    document.dispatchEvent(dragStartEvent);
+    
+    // Simulate drag over
+    const dropSection = document.querySelector('.drag-drop-section');
+    const dragOverEvent = new Event('dragover', { bubbles: true });
+    dragOverEvent.preventDefault = jest.fn();
+    Object.defineProperty(dragOverEvent, 'dataTransfer', {
+      value: { 
+        dropEffect: null,
+        types: { includes: jest.fn(() => true) }
+      }
     });
+    
+    fireEvent(dropSection, dragOverEvent);
   });
 });

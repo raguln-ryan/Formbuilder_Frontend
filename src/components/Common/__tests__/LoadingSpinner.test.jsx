@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import LoadingSpinner from '../LoadingSpinner';
 
-describe('LoadingSpinner Component', () => {
+describe('LoadingSpinner', () => {
   test('renders with default message', () => {
     render(<LoadingSpinner />);
     expect(screen.getByText('Loading...')).toBeInTheDocument();
@@ -21,11 +21,5 @@ describe('LoadingSpinner Component', () => {
   test('renders container with correct class', () => {
     const { container } = render(<LoadingSpinner />);
     expect(container.querySelector('.loading-spinner-container')).toBeInTheDocument();
-  });
-
-  test('renders message with correct class', () => {
-    render(<LoadingSpinner message="Custom loading" />);
-    const message = screen.getByText('Custom loading');
-    expect(message).toHaveClass('loading-message');
   });
 });

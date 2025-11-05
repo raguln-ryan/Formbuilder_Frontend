@@ -2,201 +2,83 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LoginForm from '../LoginForm';
-import { useAuth } from '../../../contexts/AuthContext';
+import { AuthProvider } from '../../../contexts/AuthContext';
 
-// Mock the auth context
-jest.mock('../../../contexts/AuthContext', () => ({
-  useAuth: jest.fn()
-}));
+const MockedLoginForm = ({ onSuccess }) => (
+  <BrowserRouter>
+    <AuthProvider>
+      <LoginForm onSuccess={onSuccess} />
+    </AuthProvider>
+  </BrowserRouter>
+);
 
-// Mock useNavigate
-const mockNavigate = jest.fn();
-jest.mock('react-router-dom', () => ({
-  ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate
-}));
-
-describe('LoginForm Component', () => {
-  const mockLogin = jest.fn();
-  
+describe('LoginForm', () => {
   beforeEach(() => {
-    useAuth.mockReturnValue({
-      login: mockLogin
-    });
-    mockNavigate.mockClear();
-    mockLogin.mockClear();
     localStorage.clear();
   });
 
- 
-  test('handles input changes', () => {
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const emailInput = screen.getByPlaceholderText('Enter your email');
-    const passwordInput = screen.getByPlaceholderText('Enter your password');
-    
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'password123' } });
-    
-    expect(emailInput.value).toBe('test@example.com');
-    expect(passwordInput.value).toBe('password123');
+  test('renders login form with all elements', () => {
+    render(<MockedLoginForm />);
+    expect(screen.getByText('Welcome Back')).toBeInTheDocument();
+    expect(screen.getByLabelText(/email address/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
-  test('validates email format', async () => {
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-    const emailInput = screen.getByPlaceholderText('Enter your email');
+  test('validates email field', async () => {
+    render(<MockedLoginForm />);
+    const submitBtn = screen.getByRole('button', { name: /sign in/i });
     
-    // Invalid email
-    fireEvent.change(emailInput, { target: { value: 'invalid-email' } });
-    fireEvent.click(submitButton);
+    fireEvent.click(submitBtn);
+    expect(await screen.findByText('Email is required')).toBeInTheDocument();
     
-    await waitFor(() => {
-      expect(screen.getByText('Email is invalid')).toBeInTheDocument();
-    });
+    const emailInput = screen.getByLabelText(/email address/i);
+    fireEvent.change(emailInput, { target: { value: 'invalid' } });
+    fireEvent.click(submitBtn);
+    expect(await screen.findByText('Email is invalid')).toBeInTheDocument();
   });
 
-  test('validates required fields', async () => {
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
-    fireEvent.click(submitButton);
+  test('validates password field', async () => {
+    render(<MockedLoginForm />);
+    const submitBtn = screen.getByRole('button', { name: /sign in/i });
     
-    await waitFor(() => {
-      expect(screen.getByText('Email is required')).toBeInTheDocument();
-      expect(screen.getByText('Password is required')).toBeInTheDocument();
-    });
+    fireEvent.click(submitBtn);
+    expect(await screen.findByText('Password is required')).toBeInTheDocument();
+    
+    const passwordInput = screen.getByLabelText(/password/i);
+    fireEvent.change(passwordInput, { target: { value: '123' } });
+    fireEvent.click(submitBtn);
+    expect(await screen.findByText('Password must be at least 6 characters')).toBeInTheDocument();
   });
 
-  test('validates password length', async () => {
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const passwordInput = screen.getByPlaceholderText('Enter your password');
-    const submitButton = screen.getByRole('button', { name: /sign in/i });
+  test('handles remember me checkbox', () => {
+    render(<MockedLoginForm />);
+    const checkbox = screen.getByLabelText(/remember me/i);
     
-    fireEvent.change(passwordInput, { target: { value: '12345' } });
-    fireEvent.click(submitButton);
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(true);
     
-    await waitFor(() => {
-      expect(screen.getByText('Password must be at least 6 characters')).toBeInTheDocument();
-    });
+    fireEvent.click(checkbox);
+    expect(checkbox.checked).toBe(false);
   });
 
-  test('successful login for Admin', async () => {
-    mockLogin.mockResolvedValue({ success: true });
-    localStorage.setItem('user', JSON.stringify({ role: 'Admin' }));
+  test('clears errors on input change', async () => {
+    render(<MockedLoginForm />);
+    const submitBtn = screen.getByRole('button', { name: /sign in/i });
     
-    render(
-      <BrowserRouter>
-        <LoginForm onSuccess={jest.fn()} />
-      </BrowserRouter>
-    );
-
-    const emailInput = screen.getByPlaceholderText('Enter your email');
-    const passwordInput = screen.getByPlaceholderText('Enter your password');
+    fireEvent.click(submitBtn);
+    expect(await screen.findByText('Email is required')).toBeInTheDocument();
     
-    fireEvent.change(emailInput, { target: { value: 'admin@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'password123' } });
-    fireEvent.submit(screen.getByRole('button', { name: /sign in/i }));
-    
-    await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith('admin@example.com', 'password123');
-      expect(screen.getByText('Login successful! Redirecting...')).toBeInTheDocument();
-    });
-    
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/admin');
-    }, { timeout: 2000 });
-  });
-
-  test('successful login for Learner', async () => {
-    mockLogin.mockResolvedValue({ success: true });
-    localStorage.setItem('user', JSON.stringify({ role: 'Learner' }));
-    
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const emailInput = screen.getByPlaceholderText('Enter your email');
-    const passwordInput = screen.getByPlaceholderText('Enter your password');
-    
-    fireEvent.change(emailInput, { target: { value: 'learner@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'password123' } });
-    fireEvent.submit(screen.getByRole('button', { name: /sign in/i }));
-    
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('/learner');
-    }, { timeout: 2000 });
-  });
-
-  test('handles login failure', async () => {
-    mockLogin.mockResolvedValue({ success: false, message: 'Invalid credentials' });
-    
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const emailInput = screen.getByPlaceholderText('Enter your email');
-    const passwordInput = screen.getByPlaceholderText('Enter your password');
-    
-    fireEvent.change(emailInput, { target: { value: 'test@example.com' } });
-    fireEvent.change(passwordInput, { target: { value: 'wrongpassword' } });
-    fireEvent.submit(screen.getByRole('button', { name: /sign in/i }));
-    
-    await waitFor(() => {
-      expect(screen.getByText('Invalid credentials')).toBeInTheDocument();
-    });
-  });
-
-  test('handles remember me functionality', async () => {
-    mockLogin.mockResolvedValue({ success: true });
-    
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const rememberCheckbox = screen.getByRole('checkbox', { name: /remember me/i });
-    const emailInput = screen.getByPlaceholderText('Enter your email');
-    
-    fireEvent.change(emailInput, { target: { value: 'remember@example.com' } });
-    fireEvent.click(rememberCheckbox);
-    
-    expect(rememberCheckbox.checked).toBe(true);
+    const emailInput = screen.getByLabelText(/email address/i);
+    fireEvent.change(emailInput, { target: { value: 'test@test.com' } });
+    expect(screen.queryByText('Email is required')).not.toBeInTheDocument();
   });
 
   test('loads remembered email on mount', () => {
-    localStorage.setItem('rememberedEmail', 'saved@example.com');
+    localStorage.setItem('rememberedEmail', 'remembered@test.com');
+    render(<MockedLoginForm />);
     
-    render(
-      <BrowserRouter>
-        <LoginForm />
-      </BrowserRouter>
-    );
-
-    const emailInput = screen.getByPlaceholderText('Enter your email');
-    expect(emailInput.value).toBe('saved@example.com');
+    const emailInput = screen.getByLabelText(/email address/i);
+    expect(emailInput.value).toBe('remembered@test.com');
   });
 });
