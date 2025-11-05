@@ -554,7 +554,7 @@ const FormSubmission = () => {
             {form?.questions?.map((question, index) => (
               <div key={question.id} className="question-container">
                 <label className="form-label">
-                  {['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'][index] || `${index + 1}.`} {question.text}
+                  <span className="submission-q-number">{index + 1}</span> {question.text}
                   {question.required && <span className="required">*</span>}
                 </label>
                 {question.description && question.descriptionEnabled && (

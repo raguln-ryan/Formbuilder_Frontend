@@ -1,6 +1,6 @@
 /* Main Container - Acts as Modal Overlay */
 .preview-main-container {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   right: 0;
@@ -9,14 +9,17 @@
   z-index: 9999; /* Higher z-index to cover everything */
   overflow-y: auto;
   overflow-x: hidden;
+  margin-top: 68px;
+  height: calc(100vh - 142px);
+  max-height: calc(100vh - 142px);
 }
 
 /* Inner Content Wrapper */
-.preview-main-container::before {
+/* .preview-main-container::before {
   content: '';
   display: block;
   height: 40px;
-}
+} */
 
 /* Form Card */
 .form-card-preview {
@@ -65,12 +68,28 @@
 
 /* Question Label */
 .question-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 500;
   color: #333;
   margin-bottom: 4px;
   font-size: 14px;
+
 }
+
+.submission-q-number {
+      background-color: #eef3ff;
+      color: #5d38df;
+      border-radius: 50%;
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 12px;
+    }
 
 .required-mark {
   color: #ff4444;

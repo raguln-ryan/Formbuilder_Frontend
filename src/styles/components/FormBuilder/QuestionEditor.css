@@ -135,7 +135,7 @@
 .question-body {
   padding: 10px 32px;
   animation: slideDown 0.2s ease;
-  border: 1px solid #5D38DF;
+  border-left: 1px solid #5D38DF;
   border-left: 4px solid #5D38DF;
   position: relative;
   border-radius: 12px;
@@ -148,8 +148,7 @@
 }
 
 .form-row {
-  display: grid;
-  grid-template-columns: 1fr;
+  display: flex;
   gap: 24px;
   
 }

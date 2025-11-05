@@ -430,14 +430,15 @@
 }
 
 .preview-modal-content {
-  width: 90%;
+  width: 100%;
   max-width: 1200px;
-  height: 90%;
+  height: 100%;
   background: #FFFFFF;
   border-radius: 8px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  position: relative; 
 }
 
 .preview-modal-header {

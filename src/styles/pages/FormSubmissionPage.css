@@ -100,7 +100,9 @@
 }
 
 .question-label {
-  display: block;
+  display: flex;
+  align-self: center;
+  gap: 8px;
   font-size: 16px;
   font-weight: 500;
   color: #333;

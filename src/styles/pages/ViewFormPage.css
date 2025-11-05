@@ -627,7 +627,7 @@
 .submission-view-wrapper {
   padding: 2rem;
   background-color: #f9fafb;
-  min-height: 100vh;
+  /* min-height: 100vh; */
 }
 
 .submission-view-card {

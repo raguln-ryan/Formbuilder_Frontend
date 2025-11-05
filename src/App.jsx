@@ -12,6 +12,7 @@ import FormSubmissionPage from './pages/FormSubmissionPage';
 import FormSubmission from './components/Learner/FormSubmission';
  import SubmissionView from './components/Learner/SubmissionView';
 import { Toaster } from 'react-hot-toast';
+import './App.css'
 
 function App() {
   return (

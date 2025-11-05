@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import '../../styles/components/FormBuilder/QuestionPreview.css';
+import NavigationBar from '@components/Common/NavigationBar';
 
 const QuestionPreview = ({ formTitle, formDescription, questions }) => {
   // Can optionally get form data from Redux
@@ -147,6 +148,7 @@ const QuestionPreview = ({ formTitle, formDescription, questions }) => {
 
   return (
     <>
+        {/* <NavigationBar /> */}
       <div className="preview-main-container">
         <div className="form-card-preview">
           {/* Form Header */}
@@ -168,7 +170,7 @@ const QuestionPreview = ({ formTitle, formDescription, questions }) => {
               questions.map((question, index) => (
                 <div key={question._id || index} className="form-group-preview">
                   <label className="question-label">
-                    {index + 1}. {question.question || 'Untitled Question'}
+                    <span className='submission-q-number'>{index + 1}</span>{question.question || 'Untitled Question'}
                     {question.required && <span className="required-mark">*</span>}
                   </label>
                   {question.description_enabled && question.description && (

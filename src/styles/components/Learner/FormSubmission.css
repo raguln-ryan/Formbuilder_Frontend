@@ -5,7 +5,9 @@
   padding: 40px 20px;
   background-color: #f8f9fc;
   font-family: "Inter", "Segoe UI", sans-serif;
-  margin-top: 60px;
+  max-height: calc(100vh - 160px);
+  height: calc(100vh - 160px);
+  overflow: auto;
 }
 
 .form-submission-card {
@@ -35,11 +37,13 @@
 }
 
 .form-label {
-  display: block;
+  display: flex;
+  gap: 8px;
   font-weight: 500;
   margin-bottom: 6px;
   margin-top: 18px;
   color: #333;
+
 }
 
 .form-label .required {
@@ -203,7 +207,7 @@
 .form-footer p {
   background-color: #eef1ff;
   border-radius: 6px;
-  padding: 12px 20px;
+
   display: inline-block;
   color: #555;
   font-size: 13px;

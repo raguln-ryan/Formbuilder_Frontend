@@ -97,7 +97,7 @@ const QuestionEditor = ({
     }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', e.target.innerHTML);
-    
+
     // Add dragging class to the entire question editor
     e.target.closest('.question-editor')?.classList.add('is-dragging');
   };
@@ -120,10 +120,10 @@ const QuestionEditor = ({
 
   const handleDragEnd = (e) => {
     e.preventDefault();
-    
+
     // Remove dragging class
     e.target.closest('.question-editor')?.classList.remove('is-dragging');
-    
+
     if (onDragEnd) {
       onDragEnd();
     }
@@ -144,7 +144,7 @@ const QuestionEditor = ({
         <div className="question-body">
           <div className="question-form">
             {/* Three-dot drag handle */}
-            <div 
+            <div
               className="drag-handle-wrapper"
               draggable="true"
               onDragStart={handleDragStart}
@@ -154,13 +154,23 @@ const QuestionEditor = ({
             >
               <img src={Threedot} alt="Drag to reorder" className="three-dot" />
             </div>
-            
+
             <Input
               value={localQuestion.question || ''}
               onChange={(e) => handleFieldChange('question', e.target.value)}
               placeholder="Untitled question"
               required
             />
+            {localQuestion.description_enabled && (
+              <Input
+                type="textarea"
+                label="Description"
+                value={localQuestion.description || ''}
+                onChange={(e) => handleFieldChange('description', e.target.value)}
+                placeholder="Add helpful text for this question"
+                rows={2}
+              />
+            )}
 
             {/* Question Type Display - Disabled */}
             <div className="question-type-display">
@@ -225,6 +235,7 @@ const QuestionEditor = ({
                         setLocalQuestion(updated);
                         onUpdate(updated); // Update parent with both fields at once
                       }}
+                      style={{marginRight: 8}}
                     />
                     <span>Single Select</span>
                   </label>
@@ -243,6 +254,7 @@ const QuestionEditor = ({
                         setLocalQuestion(updated);
                         onUpdate(updated); // Update parent with both fields at once
                       }}
+                      style={{marginRight: 8}}
                     />
                     <span>Multi Select</span>
                   </label>
@@ -263,16 +275,6 @@ const QuestionEditor = ({
               </div>
             )}
 
-            {localQuestion.description_enabled && (
-              <Input
-                type="textarea"
-                label="Description"
-                value={localQuestion.description || ''}
-                onChange={(e) => handleFieldChange('description', e.target.value)}
-                placeholder="Add helpful text for this question"
-                rows={2}
-              />
-            )}
 
             {hasOptions && (
               <div className="options-section">
