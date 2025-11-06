@@ -1,26 +1,21 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
-import '@testing-library/jest-dom';
+import { Provider } from 'react-redux';
+import { BrowserRouter, useNavigate } from 'react-router-dom';
+import { configureStore } from '@reduxjs/toolkit';
 import FormList from '../FormList';
-import formService from '../../../services/formService';
-import toast from 'react-hot-toast';
-import * as AuthContext from '../../../contexts/AuthContext';
+import { useAuth } from '../../../contexts/AuthContext';
+import * as formListSlice from '../../../store/slices/formListSlice';
 import { debounce } from 'lodash';
 
 // Mock dependencies
-const mockNavigate = jest.fn();
 jest.mock('react-router-dom', () => ({
   ...jest.requireActual('react-router-dom'),
-  useNavigate: () => mockNavigate
+  useNavigate: jest.fn()
 }));
 
-jest.mock('react-hot-toast');
-jest.mock('../../../services/formService');
-jest.mock('../../../styles/components/FormBuilder/FormList.css', () => ({}));
-jest.mock('../../../assets/Ellipse.png', () => 'search-icon');
+jest.mock('../../../contexts/AuthContext');
 
-// Mock lodash debounce
 jest.mock('lodash', () => ({
   debounce: jest.fn((fn) => {
     const debounced = (...args) => fn(...args);
@@ -29,1101 +24,938 @@ jest.mock('lodash', () => ({
   })
 }));
 
-// Mock child components
+jest.mock('../../Common/LoadingSpinner', () => {
+  return function LoadingSpinner() {
+    return <div>Loading...</div>;
+  };
+});
+
 jest.mock('../../Common/Button', () => {
-  return function MockButton({ children, onClick, ...props }) {
+  return function Button({ children, onClick, ...props }) {
     return <button onClick={onClick} {...props}>{children}</button>;
   };
 });
 
-jest.mock('../../Common/LoadingSpinner', () => {
-  return function MockLoadingSpinner() {
-    return <div data-testid="loading-spinner">Loading...</div>;
-  };
-});
-
 jest.mock('../../Common/Modal', () => {
-  return function MockModal({ isOpen, onClose, onConfirm, title, message }) {
+  return function Modal({ isOpen, onClose, onConfirm, title, message, confirmText }) {
     if (!isOpen) return null;
     return (
       <div data-testid="modal">
         <div>{title}</div>
         <div>{message}</div>
         <button onClick={onClose}>Cancel</button>
-        <button onClick={onConfirm}>Confirm</button>
+        <button onClick={onConfirm}>{confirmText || 'Confirm'}</button>
       </div>
     );
   };
 });
 
+// Create mock reducer
+const createMockReducer = (initialState) => {
+  return (state = initialState, action) => {
+    if (action.type === 'formList/setActiveMenu') {
+      return { ...state, activeMenu: action.payload };
+    }
+    if (action.type === 'formList/setSearchTerm') {
+      return { ...state, searchTerm: action.payload };
+    }
+    if (action.type === 'formList/setPage') {
+      return { ...state, pagination: { ...state.pagination, page: action.payload } };
+    }
+    if (action.type === 'formList/setPageSize') {
+      return { ...state, pagination: { ...state.pagination, pageSize: action.payload } };
+    }
+    if (action.type === 'formList/closeDeleteModal') {
+      return { ...state, deleteModal: { ...state.deleteModal, isOpen: false } };
+    }
+    if (action.type === 'formList/openDeleteModal') {
+      return { ...state, deleteModal: { ...state.deleteModal, isOpen: true, ...action.payload } };
+    }
+    return state;
+  };
+};
+
 describe('FormList', () => {
-  const mockUseAuth = {
-    user: { role: 'Admin' },
-    isAuthenticated: true
+  let mockStore;
+  let mockNavigate;
+  let mockDispatch;
+  let initialState;
+
+  beforeEach(() => {
+    mockNavigate = jest.fn();
+    mockDispatch = jest.fn((action) => {
+      if (typeof action === 'function') {
+        return action(mockDispatch);
+      }
+      return action;
+    });
+    
+    useNavigate.mockReturnValue(mockNavigate);
+    useAuth.mockReturnValue({
+      user: { role: 'Admin' },
+      isAuthenticated: true
+    });
+
+    initialState = {
+      forms: [],
+      searchTerm: '',
+      loading: false,
+      error: null,
+      deleteModal: {
+        isOpen: false,
+        formId: null,
+        formTitle: '',
+        formStatus: null,
+        hasResponses: false,
+        responseCount: 0
+      },
+      activeMenu: null,
+      isDeleting: false,
+      formEnabledStatus: {},
+      pagination: {
+        page: 1,
+        pageSize: 10,
+        totalItems: 0,
+        totalPages: 0
+      }
+    };
+
+    // Setup all action creators
+    Object.keys(formListSlice).forEach(key => {
+      if (typeof formListSlice[key] === 'function') {
+        formListSlice[key] = jest.fn((payload) => ({
+          type: `formList/${key}`,
+          payload
+        }));
+      }
+    });
+
+    // Setup async action matchers
+    formListSlice.checkFormResponses.fulfilled = { match: jest.fn(() => false) };
+    formListSlice.deleteForm.fulfilled = { match: jest.fn(() => false) };
+
+    mockStore = configureStore({
+      reducer: {
+        formList: createMockReducer(initialState)
+      }
+    });
+    mockStore.dispatch = mockDispatch;
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const renderComponent = (customState = {}) => {
+    const state = { ...initialState, ...customState };
+    mockStore = configureStore({
+      reducer: {
+        formList: createMockReducer(state)
+      }
+    });
+    mockStore.dispatch = mockDispatch;
+
+    return render(
+      <Provider store={mockStore}>
+        <BrowserRouter>
+          <FormList />
+        </BrowserRouter>
+      </Provider>
+    );
   };
 
-  const mockFormsResponse = {
-    data: [
+  describe('Authentication', () => {
+    test('redirects to login when not authenticated', () => {
+      useAuth.mockReturnValue({
+        user: null,
+        isAuthenticated: false
+      });
+
+      renderComponent();
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+
+    test('redirects to login when user is not Admin', () => {
+      useAuth.mockReturnValue({
+        user: { role: 'Learner' },
+        isAuthenticated: true
+      });
+
+      renderComponent();
+      expect(mockNavigate).toHaveBeenCalledWith('/login');
+    });
+
+    test('does not redirect when authenticated as Admin', () => {
+      renderComponent();
+      expect(mockNavigate).not.toHaveBeenCalledWith('/login');
+    });
+  });
+
+  describe('Component Lifecycle', () => {
+    test('dispatches resetFormList on unmount', () => {
+      const { unmount } = renderComponent();
+      
+      unmount();
+      
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/resetFormList'
+      });
+    });
+
+    test('fetches forms on mount', () => {
+      renderComponent();
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/fetchForms',
+        payload: { page: 1, pageSize: 10, searchTerm: '' }
+      });
+    });
+
+    test('fetches forms when page changes', () => {
+      renderComponent({ 
+        pagination: { page: 2, pageSize: 10, totalItems: 20, totalPages: 2 }
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/fetchForms',
+        payload: { page: 2, pageSize: 10, searchTerm: '' }
+      });
+    });
+
+    test('fetches forms when pageSize changes', () => {
+      renderComponent({ 
+        pagination: { page: 1, pageSize: 20, totalItems: 50, totalPages: 3 }
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/fetchForms',
+        payload: { page: 1, pageSize: 20, searchTerm: '' }
+      });
+    });
+  });
+
+  describe('Search Functionality', () => {
+    test('handles search input change', async () => {
+      renderComponent();
+
+      const searchInput = screen.getByPlaceholderText('Search');
+      fireEvent.change(searchInput, { target: { value: 'test' } });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setSearchTerm',
+        payload: 'test'
+      });
+
+      await waitFor(() => {
+        expect(mockDispatch).toHaveBeenCalledWith({
+          type: 'formList/setPage',
+          payload: 1
+        });
+        expect(mockDispatch).toHaveBeenCalledWith({
+          type: 'formList/fetchForms',
+          payload: { page: 1, pageSize: 10, searchTerm: 'test' }
+        });
+      });
+    });
+
+    test('handles clear search', () => {
+      renderComponent({ searchTerm: 'test' });
+
+      const clearButton = screen.getByText('Clear Search');
+      fireEvent.click(clearButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setSearchTerm',
+        payload: ''
+      });
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setPage',
+        payload: 1
+      });
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/fetchForms',
+        payload: { page: 1, pageSize: 10, searchTerm: '' }
+      });
+    });
+  });
+
+  describe('Loading and Error States', () => {
+    test('shows loading spinner when loading without search', () => {
+      renderComponent({ loading: true, searchTerm: '' });
+      expect(screen.getByText('Loading...')).toBeInTheDocument();
+    });
+
+    test('shows search loading when loading with search', () => {
+      renderComponent({ loading: true, searchTerm: 'test' });
+      expect(screen.getByText('Searching for "test"...')).toBeInTheDocument();
+    });
+
+    test('shows error state with retry', () => {
+      renderComponent({ error: 'Failed to load forms' });
+
+      expect(screen.getByText('Error')).toBeInTheDocument();
+      expect(screen.getByText('Failed to load forms')).toBeInTheDocument();
+
+      const retryButton = screen.getByText('Retry');
+      fireEvent.click(retryButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/fetchForms',
+        payload: { page: 1, pageSize: 10, searchTerm: '' }
+      });
+    });
+  });
+
+  describe('Empty States', () => {
+    test('shows empty state without search', () => {
+      renderComponent({ forms: [] });
+
+      expect(screen.getByText('No forms found')).toBeInTheDocument();
+      expect(screen.getByText('Create your first form to get started')).toBeInTheDocument();
+      
+      const createButton = screen.getAllByText('Create Form')[1];
+      fireEvent.click(createButton);
+      
+      expect(mockNavigate).toHaveBeenCalledWith('/form/new');
+    });
+
+    test('shows empty state with search', () => {
+      renderComponent({ forms: [], searchTerm: 'test' });
+
+      expect(screen.getByText('No forms found')).toBeInTheDocument();
+      expect(screen.getByText('No forms match your search "test"')).toBeInTheDocument();
+    });
+  });
+
+  describe('Form Display', () => {
+    const mockForms = [
       {
-        formId: 'form-1',
+        formId: '1',
         title: 'Test Form 1',
-        description: 'Description 1',
         status: 0,
         createdBy: 'Admin',
-        createdAt: '2024-01-01T00:00:00Z',
+        createdAt: '2024-01-01',
         isEnabled: false
       },
       {
-        formId: 'form-2',
+        formId: '2',
         title: 'Published Form',
-        description: 'Description 2',
         status: 1,
         publishedBy: 'Admin',
-        publishedAt: '2024-01-02T00:00:00Z',
+        publishedAt: '2024-01-02',
         isEnabled: true
       }
-    ],
-    totalCount: 2,
-    pageNumber: 1,
-    pageSize: 10,
-    totalPages: 1
-  };
+    ];
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    jest.spyOn(AuthContext, 'useAuth').mockImplementation(() => mockUseAuth);
-    formService.getAllForms.mockResolvedValue(mockFormsResponse);
-    formService.deleteForm.mockResolvedValue({ success: true, message: 'Form deleted' });
-    formService.getFormResponses.mockResolvedValue({ data: [], totalCount: 0 });
-  });
+    test('displays draft forms correctly', () => {
+      renderComponent({ forms: [mockForms[0]] });
 
-  test('renders form list with forms', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
       expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(screen.getByText('Draft')).toBeInTheDocument();
+      expect(screen.getByText('Admin')).toBeInTheDocument();
+      expect(screen.getByText('Created by:')).toBeInTheDocument();
+      expect(screen.getByText('1/1/2024')).toBeInTheDocument();
+    });
+
+    test('displays published forms correctly', () => {
+      renderComponent({ forms: [mockForms[1]] });
+
       expect(screen.getByText('Published Form')).toBeInTheDocument();
+      expect(screen.getByText('Published')).toBeInTheDocument();
+      expect(screen.getByText('Admin')).toBeInTheDocument();
+      expect(screen.getByText('Published by:')).toBeInTheDocument();
+      expect(screen.getByText('Enabled')).toBeInTheDocument();
+    });
+
+    test('handles form without title', () => {
+      renderComponent({ 
+        forms: [{ ...mockForms[0], title: null }] 
+      });
+
+      expect(screen.getByText('Untitled Form')).toBeInTheDocument();
+    });
+
+    test('handles form without dates', () => {
+      renderComponent({ 
+        forms: [{ ...mockForms[0], createdAt: null }] 
+      });
+
+      expect(screen.getByText('N/A')).toBeInTheDocument();
     });
   });
 
-  test('redirects when not authenticated', () => {
-    jest.spyOn(AuthContext, 'useAuth').mockImplementation(() => ({
-      user: null,
-      isAuthenticated: false
-    }));
+  describe('Menu Actions', () => {
+    const mockForms = [
+      {
+        formId: '1',
+        title: 'Draft Form',
+        status: 0,
+        isEnabled: false
+      },
+      {
+        formId: '2',
+        title: 'Published Form',
+        status: 1,
+        isEnabled: true
+      }
+    ];
 
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
+    test('toggles menu on click', () => {
+      renderComponent({ forms: mockForms });
 
-    expect(mockNavigate).toHaveBeenCalledWith('/login');
-  });
+      const menuButton = screen.getAllByLabelText('More options')[0];
+      fireEvent.click(menuButton);
 
-  test('redirects when user is not admin', () => {
-    jest.spyOn(AuthContext, 'useAuth').mockImplementation(() => ({
-      user: { role: 'User' },
-      isAuthenticated: true
-    }));
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    expect(mockNavigate).toHaveBeenCalledWith('/login');
-  });
-
-  test('handles search input change', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setActiveMenu',
+        payload: '1'
+      });
     });
 
-    const searchInput = screen.getByPlaceholderText('Search');
-    fireEvent.change(searchInput, { target: { value: 'test search' } });
+    test('closes menu when clicking same button', () => {
+      renderComponent({ forms: mockForms, activeMenu: '1' });
 
-    expect(searchInput.value).toBe('test search');
-  });
+      const menuButton = screen.getAllByLabelText('More options')[0];
+      fireEvent.click(menuButton);
 
-  test('handles clear search', async () => {
-    formService.getAllForms
-      .mockResolvedValueOnce(mockFormsResponse) // Initial load
-      .mockResolvedValueOnce({ data: [], totalCount: 0, totalPages: 0 }); // After search
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setActiveMenu',
+        payload: null
+      });
     });
 
-    const searchInput = screen.getByPlaceholderText('Search');
-    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+    test('shows draft menu options', () => {
+      renderComponent({ forms: mockForms, activeMenu: '1' });
 
-    await waitFor(() => {
-      expect(screen.getByText(/No forms match your search/)).toBeInTheDocument();
+      expect(screen.getByText('Edit')).toBeInTheDocument();
+      expect(screen.getByText('Publish')).toBeInTheDocument();
+      expect(screen.getByText('Delete')).toBeInTheDocument();
     });
 
-    const clearButton = screen.getByText('Clear Search');
-    fireEvent.click(clearButton);
+    test('shows published menu options', () => {
+      renderComponent({ forms: mockForms, activeMenu: '2' });
 
-    await waitFor(() => {
-      expect(searchInput.value).toBe('');
-    });
-  });
-
-  test('handles page change', async () => {
-    const multiPageResponse = {
-      ...mockFormsResponse,
-      totalCount: 25,
-      totalPages: 3
-    };
-
-    formService.getAllForms.mockResolvedValue(multiPageResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(screen.getByText('View Form')).toBeInTheDocument();
+      expect(screen.getByText('Delete')).toBeInTheDocument();
     });
 
-    // Page numbers are rendered
-    const page2Button = screen.getByText('2');
-    fireEvent.click(page2Button);
+    test('handles edit action', () => {
+      renderComponent({ forms: mockForms, activeMenu: '1' });
 
-    await waitFor(() => {
-      expect(formService.getAllForms).toHaveBeenCalledWith(2, 10, '');
-    });
-  });
+      const editButton = screen.getByText('Edit');
+      fireEvent.click(editButton);
 
-  test('handles page size change', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(mockNavigate).toHaveBeenCalledWith('/form/1/edit');
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setActiveMenu',
+        payload: null
+      });
     });
 
-    const pageSizeSelect = screen.getByRole('combobox');
-    fireEvent.change(pageSizeSelect, { target: { value: '25' } });
+    test('handles view form action', () => {
+      renderComponent({ forms: mockForms, activeMenu: '2' });
 
-    await waitFor(() => {
-      expect(formService.getAllForms).toHaveBeenCalledWith(1, 25, '');
+      const viewButton = screen.getByText('View Form');
+      fireEvent.click(viewButton);
+
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/form/2/view',
+        { state: { activeTab: 'configuration' } }
+      );
+    });
+
+    test('handles publish action', () => {
+      renderComponent({ forms: mockForms, activeMenu: '1' });
+
+      const publishButton = screen.getByText('Publish');
+      fireEvent.click(publishButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setActiveMenu',
+        payload: null
+      });
+    });
+
+    test('closes menu on outside click', () => {
+      renderComponent({ forms: mockForms, activeMenu: '1' });
+
+      // Simulate clicking outside
+      fireEvent.click(document.body);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setActiveMenu',
+        payload: null
+      });
+    });
+
+    test('does not close menu when clicking inside menu', () => {
+      const { container } = renderComponent({ forms: mockForms, activeMenu: '1' });
+
+      const menuContainer = container.querySelector('.menu-container');
+      fireEvent.click(menuContainer);
+
+      expect(mockDispatch).not.toHaveBeenCalledWith({
+        type: 'formList/setActiveMenu',
+        payload: null
+      });
     });
   });
 
-  test('handles previous page navigation', async () => {
-    const multiPageResponse = {
-      ...mockFormsResponse,
-      pageNumber: 2,
-      totalPages: 3
-    };
+  describe('Toggle Enable/Disable', () => {
+    test('handles toggle enable for published form', () => {
+      const mockForms = [{
+        formId: '1',
+        title: 'Published Form',
+        status: 1,
+        isEnabled: false
+      }];
 
-    formService.getAllForms.mockResolvedValue(multiPageResponse);
+      renderComponent({ forms: mockForms });
 
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
+      const toggleSwitch = screen.getByRole('checkbox');
+      fireEvent.change(toggleSwitch, { target: { checked: true } });
 
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/toggleFormEnabled',
+        payload: { formId: '1', currentStatus: false }
+      });
     });
 
-    // Set page to 2 first
-    act(() => {
+    test('handles toggle disable for published form', () => {
+      const mockForms = [{
+        formId: '1',
+        title: 'Published Form',
+        status: 1,
+        isEnabled: true
+      }];
+
+      renderComponent({ forms: mockForms });
+
+      const toggleSwitch = screen.getByRole('checkbox');
+      fireEvent.change(toggleSwitch, { target: { checked: false } });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/toggleFormEnabled',
+        payload: { formId: '1', currentStatus: true }
+      });
+    });
+  });
+
+  describe('View Responses', () => {
+    test('handles view responses for published form', () => {
+      const mockForms = [{
+        formId: '1',
+        title: 'Published Form',
+        status: 1
+      }];
+
+      renderComponent({ forms: mockForms });
+
+      const viewResponsesBtn = screen.getByText('View Responses');
+      fireEvent.click(viewResponsesBtn);
+
+      expect(mockNavigate).toHaveBeenCalledWith(
+        '/form/1/view',
+        { state: { activeTab: 'responses' } }
+      );
+    });
+
+    test('disables view responses for draft form', () => {
+      const mockForms = [{
+        formId: '1',
+        title: 'Draft Form',
+        status: 0
+      }];
+
+      renderComponent({ forms: mockForms });
+
+      const viewResponsesBtn = screen.getByText('View Responses');
+      expect(viewResponsesBtn).toBeDisabled();
+      expect(viewResponsesBtn).toHaveAttribute('title', 'Publish form to view responses');
+    });
+
+    test('does not navigate when clicking disabled view responses', () => {
+      const mockForms = [{
+        formId: '1',
+        title: 'Draft Form',
+        status: 0
+      }];
+
+      renderComponent({ forms: mockForms });
+
+      const viewResponsesBtn = screen.getByText('View Responses');
+      fireEvent.click(viewResponsesBtn);
+
+      expect(mockNavigate).not.toHaveBeenCalledWith(
+        '/form/1/view',
+        expect.any(Object)
+      );
+    });
+  });
+
+  describe('Delete Flow', () => {
+    test('handles delete click for draft form', async () => {
+      const mockForms = [{
+        formId: '1',
+        title: 'Draft Form',
+        status: 0
+      }];
+
+      renderComponent({ forms: mockForms, activeMenu: '1' });
+
+      const deleteButton = screen.getByText('Delete');
+      fireEvent.click(deleteButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/openDeleteModal',
+        payload: {
+          formId: '1',
+          formTitle: 'Draft Form',
+          formStatus: 0
+        }
+      });
+    });
+
+    test('checks responses before delete for published form', async () => {
+      const mockForms = [{
+        formId: '2',
+        title: 'Published Form',
+        status: 1
+      }];
+
+      mockDispatch.mockResolvedValue({ 
+        payload: { hasResponses: true, responseCount: 5 } 
+      });
+      formListSlice.checkFormResponses.fulfilled.match.mockReturnValue(true);
+
+      renderComponent({ forms: mockForms, activeMenu: '2' });
+
+      const deleteButton = screen.getByText('Delete');
+      await act(async () => {
+        fireEvent.click(deleteButton);
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/checkFormResponses',
+        payload: { formId: '2' }
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/openDeleteModal',
+        payload: {
+          formId: '2',
+          formTitle: 'Published Form',
+          formStatus: 1,
+          hasResponses: true,
+          responseCount: 5
+        }
+      });
+    });
+
+    test('confirms delete with responses', async () => {
+      mockDispatch.mockResolvedValue({ type: 'formList/deleteForm/fulfilled' });
+      formListSlice.deleteForm.fulfilled.match.mockReturnValue(true);
+
+      renderComponent({ 
+        deleteModal: {
+          isOpen: true,
+          formId: '1',
+          formTitle: 'Test Form',
+          hasResponses: true,
+          responseCount: 3
+        },
+        pagination: { page: 1, pageSize: 10, totalItems: 11, totalPages: 2 }
+      });
+
+      const modal = screen.getByTestId('modal');
+      expect(modal).toBeInTheDocument();
+      expect(screen.getByText(/This form has 3 submission/)).toBeInTheDocument();
+
+      const confirmButton = screen.getByText('Yes, Delete');
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/closeDeleteModal'
+      });
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/deleteForm',
+        payload: { formId: '1', formTitle: 'Test Form' }
+      });
+    });
+
+    test('handles delete with page adjustment', async () => {
+      mockDispatch.mockResolvedValue({ type: 'formList/deleteForm/fulfilled' });
+      formListSlice.deleteForm.fulfilled.match.mockReturnValue(true);
+
+      renderComponent({ 
+        deleteModal: {
+          isOpen: true,
+          formId: '1',
+          formTitle: 'Test Form'
+        },
+        pagination: { page: 2, pageSize: 10, totalItems: 11, totalPages: 2 }
+      });
+
+      jest.useFakeTimers();
+
+      const confirmButton = screen.getByText('Yes, Delete');
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      act(() => {
+        jest.advanceTimersByTime(500);
+      });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/fetchForms',
+        payload: { page: 1, pageSize: 10, searchTerm: '' }
+      });
+
+      jest.useRealTimers();
+    });
+
+    test('prevents delete while deleting', async () => {
+      renderComponent({ 
+        deleteModal: {
+          isOpen: true,
+          formId: '1',
+          formTitle: 'Test Form'
+        },
+        isDeleting: true
+      });
+
+      const confirmButton = screen.getByText('Yes, Delete');
+      await act(async () => {
+        fireEvent.click(confirmButton);
+      });
+
+      expect(mockDispatch).not.toHaveBeenCalledWith({
+        type: 'formList/deleteForm',
+        payload: expect.any(Object)
+      });
+    });
+
+    test('cancels delete modal', () => {
+      renderComponent({ 
+        deleteModal: {
+          isOpen: true,
+          formId: '1',
+          formTitle: 'Test Form'
+        }
+      });
+
+      const cancelButton = screen.getByText('Cancel');
+      fireEvent.click(cancelButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/closeDeleteModal'
+      });
+    });
+  });
+
+  describe('Pagination', () => {
+    test('shows pagination when totalPages > 1', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      expect(screen.getByText('Showing 1 to 10 of 25 forms')).toBeInTheDocument();
+      expect(screen.getByText('Previous')).toBeInTheDocument();
+      expect(screen.getByText('Next')).toBeInTheDocument();
+    });
+
+    test('handles next page navigation', () => {
+      window.scrollTo = jest.fn();
+      
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      const nextButton = screen.getByText('Next');
+      fireEvent.click(nextButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setPage',
+        payload: 2
+      });
+      expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
+    });
+
+    test('handles previous page navigation', () => {
+      window.scrollTo = jest.fn();
+
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 2, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      const prevButton = screen.getByText('Previous');
+      fireEvent.click(prevButton);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setPage',
+        payload: 1
+      });
+    });
+
+    test('disables previous on first page', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      const prevButton = screen.getByText('Previous');
+      expect(prevButton).toBeDisabled();
+    });
+
+    test('disables next on last page', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 3, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      const nextButton = screen.getByText('Next');
+      expect(nextButton).toBeDisabled();
+    });
+
+    test('handles page number click', () => {
+      window.scrollTo = jest.fn();
+
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
       const page2Button = screen.getByText('2');
       fireEvent.click(page2Button);
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setPage',
+        payload: 2
+      });
     });
 
-    await waitFor(() => {
-      const prevButton = screen.getByText('‹');
-      fireEvent.click(prevButton);
+    test('handles page size change', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 50, totalPages: 5 }
+      });
+
+      const pageSizeSelect = screen.getByDisplayValue('10 per page');
+      fireEvent.change(pageSizeSelect, { target: { value: '20' } });
+
+      expect(mockDispatch).toHaveBeenCalledWith({
+        type: 'formList/setPageSize',
+        payload: 20
+      });
+    });
+
+    test('does not show pagination when totalPages <= 1', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 5, totalPages: 1 }
+      });
+
+      expect(screen.queryByText('Previous')).not.toBeInTheDocument();
+      expect(screen.queryByText('Next')).not.toBeInTheDocument();
+    });
+
+    test('prevents navigation to invalid page', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 3, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      // Try to navigate beyond last page
+      const nextButton = screen.getByText('Next');
+      fireEvent.click(nextButton);
+
+      expect(mockDispatch).not.toHaveBeenCalledWith({
+        type: 'formList/setPage',
+        payload: 4
+      });
+    });
+
+    test('shows correct page info for last page', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 3, pageSize: 10, totalItems: 25, totalPages: 3 }
+      });
+
+      expect(screen.getByText('Showing 21 to 25 of 25 forms')).toBeInTheDocument();
     });
   });
 
-  test('handles next page navigation', async () => {
-    const multiPageResponse = {
-      ...mockFormsResponse,
-      totalCount: 25,
-      totalPages: 3
-    };
+  describe('Page Number Display', () => {
+    test('shows all pages when totalPages <= 5', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 1, pageSize: 10, totalItems: 40, totalPages: 4 }
+      });
 
-    formService.getAllForms.mockResolvedValue(multiPageResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByText('3')).toBeInTheDocument();
+      expect(screen.getByText('4')).toBeInTheDocument();
     });
 
-    const nextButton = screen.getByText('›');
-    fireEvent.click(nextButton);
+    test('shows ellipsis at end when page <= 3', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 2, pageSize: 10, totalItems: 100, totalPages: 10 }
+      });
 
-    await waitFor(() => {
-      expect(formService.getAllForms).toHaveBeenCalledWith(2, 10, '');
-    });
-  });
-
-  test('disables navigation at boundaries', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getByText('2')).toBeInTheDocument();
+      expect(screen.getByText('3')).toBeInTheDocument();
+      expect(screen.getByText('4')).toBeInTheDocument();
+      expect(screen.getByText('...')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
     });
 
-    const prevButton = screen.getByText('‹');
-    const nextButton = screen.getByText('›');
+    test('shows ellipsis at start when page >= totalPages - 2', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 9, pageSize: 10, totalItems: 100, totalPages: 10 }
+      });
 
-    expect(prevButton).toBeDisabled();
-    expect(nextButton).toBeDisabled(); // Only 1 page
-  });
-
-  test('renders page numbers correctly for many pages', async () => {
-    const manyPagesResponse = {
-      ...mockFormsResponse,
-      totalCount: 100,
-      totalPages: 10,
-      pageNumber: 5
-    };
-
-    formService.getAllForms.mockResolvedValue(manyPagesResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    // Should show 1 ... 4 5 6 ... 10
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getAllByText('...')).toHaveLength(2);
-    expect(screen.getByText('10')).toBeInTheDocument();
-  });
-
-  test('renders page numbers at end correctly', async () => {
-    const endPagesResponse = {
-      ...mockFormsResponse,
-      totalCount: 100,
-      totalPages: 10,
-      pageNumber: 9
-    };
-
-    formService.getAllForms.mockResolvedValue(endPagesResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    // Navigate to page 9
-    act(() => {
-      const page9 = screen.getByText('9');
-      fireEvent.click(page9);
-    });
-
-    await waitFor(() => {
       expect(screen.getByText('1')).toBeInTheDocument();
       expect(screen.getByText('...')).toBeInTheDocument();
+      expect(screen.getByText('7')).toBeInTheDocument();
+      expect(screen.getByText('8')).toBeInTheDocument();
+      expect(screen.getByText('9')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
+    });
+
+    test('shows ellipsis on both sides for middle pages', () => {
+      renderComponent({
+        forms: [{ formId: '1', title: 'Form 1' }],
+        pagination: { page: 5, pageSize: 10, totalItems: 100, totalPages: 10 }
+      });
+
+      expect(screen.getByText('1')).toBeInTheDocument();
+      expect(screen.getAllByText('...').length).toBe(2);
+      expect(screen.getByText('4')).toBeInTheDocument();
+      expect(screen.getByText('5')).toBeInTheDocument();
+      expect(screen.getByText('6')).toBeInTheDocument();
       expect(screen.getByText('10')).toBeInTheDocument();
     });
   });
 
-  test('handles API error', async () => {
-    formService.getAllForms.mockRejectedValue(new Error('Network error'));
+  describe('Create Form Navigation', () => {
+    test('navigates to create form from header', () => {
+      renderComponent();
 
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
+      const createButton = screen.getAllByText('Create Form')[0];
+      fireEvent.click(createButton);
 
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Error loading forms: Network error');
-      expect(screen.getByText('Failed to load forms. Please try again.')).toBeInTheDocument();
+      expect(mockNavigate).toHaveBeenCalledWith('/form/new');
     });
-  });
-
-  test('handles API error with response data', async () => {
-    formService.getAllForms.mockRejectedValue({
-      response: { data: { message: 'Custom error message' } }
-    });
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Error loading forms: Custom error message');
-    });
-  });
-
-  test('handles retry after error', async () => {
-    formService.getAllForms
-      .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce(mockFormsResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Failed to load forms. Please try again.')).toBeInTheDocument();
-    });
-
-    const retryButton = screen.getByText('Retry');
-    fireEvent.click(retryButton);
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-  });
-
-  test('toggles menu for form', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    expect(screen.getByText('Edit')).toBeInTheDocument();
-  });
-
-  test('closes menu when clicking outside', async () => {
-    const { container } = render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    expect(screen.getByText('Edit')).toBeInTheDocument();
-
-    // Click outside
-    fireEvent.click(container.firstChild);
-
-    await waitFor(() => {
-      expect(screen.queryByText('Edit')).not.toBeInTheDocument();
-    });
-  });
-
-  test('handles edit form', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const editButton = screen.getByText('Edit');
-    fireEvent.click(editButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/form/form-1/edit');
-  });
-
-  test('handles view responses', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Published Form')).toBeInTheDocument();
-    });
-
-    const viewResponsesButtons = screen.getAllByText('View Responses');
-    fireEvent.click(viewResponsesButtons[0]);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/form/form-2/view', { state: { activeTab: 'responses' } });
-  });
-
-  test('disables view responses for draft forms', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const viewResponsesButtons = screen.getAllByText('View Responses');
-    expect(viewResponsesButtons[0]).toBeDisabled();
-    expect(viewResponsesButtons[0]).toHaveAttribute('title', 'Publish form to view responses');
-  });
-
-  test('handles view form', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Published Form')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[1]); // Published form menu
-
-    const viewButton = screen.getByText('View Form');
-    fireEvent.click(viewButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/form/form-2/view', { state: { activeTab: 'configuration' } });
-  });
-
-  test('handles toggle enable/disable', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Published Form')).toBeInTheDocument();
-    });
-
-    const toggleSwitches = screen.getAllByRole('checkbox');
-    fireEvent.click(toggleSwitches[0]);
-
-    expect(toast.success).toHaveBeenCalledWith('Form disabled');
-  });
-
-  test('handles delete draft form', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    expect(screen.getByTestId('modal')).toBeInTheDocument();
-    expect(screen.getByText(/Are you sure you want to delete this draft form/)).toBeInTheDocument();
-  });
-
-  test('handles delete published form with responses', async () => {
-    formService.getFormResponses.mockResolvedValue({ 
-      data: [{ id: 1 }], 
-      totalCount: 5 
-    });
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Published Form')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[1]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    await waitFor(() => {
-      expect(screen.getByTestId('modal')).toBeInTheDocument();
-      expect(screen.getByText(/This form has 5 submission/)).toBeInTheDocument();
-    });
-  });
-
-  test('confirms delete', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    const confirmButton = screen.getByText('Confirm');
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Form deleted successfully');
-    });
-  });
-
-  test('handles delete error', async () => {
-    formService.deleteForm.mockRejectedValue(new Error('Delete failed'));
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    const confirmButton = screen.getByText('Confirm');
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(toast.error).toHaveBeenCalledWith('Delete failed');
-    });
-  });
-
-  test('prevents multiple delete operations', async () => {
-    let deletePromiseResolve;
-    const deletePromise = new Promise(resolve => {
-      deletePromiseResolve = resolve;
-    });
-    
-    formService.deleteForm.mockReturnValue(deletePromise);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    const confirmButton = screen.getByText('Confirm');
-    fireEvent.click(confirmButton);
-
-    // Try to click again while deleting
-    fireEvent.click(confirmButton);
-
-    // Should only call delete once
-    expect(formService.deleteForm).toHaveBeenCalledTimes(1);
-
-    // Resolve the promise
-    deletePromiseResolve({ success: true, message: 'Deleted' });
-  });
-
-  test('adjusts page after delete when on last item of page', async () => {
-    const twoPageResponse = {
-      data: [mockFormsResponse.data[0]],
-      totalCount: 11,
-      pageNumber: 2,
-      pageSize: 10,
-      totalPages: 2
-    };
-
-    formService.getAllForms.mockResolvedValue(twoPageResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    const confirmButton = screen.getByText('Confirm');
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalled();
-    });
-  });
-
-  test('handles publish form', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const publishButton = screen.getByText('Publish');
-    fireEvent.click(publishButton);
-
-    expect(screen.queryByText('Edit')).not.toBeInTheDocument(); // Menu should close
-  });
-
-  test('handles create form button', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const createButtons = screen.getAllByText('Create Form');
-    fireEvent.click(createButtons[0]);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/form/new');
-  });
-
-  test('renders empty state', async () => {
-    formService.getAllForms.mockResolvedValue({
-      data: [],
-      totalCount: 0,
-      totalPages: 0
-    });
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('No forms found')).toBeInTheDocument();
-      expect(screen.getByText('Create your first form to get started')).toBeInTheDocument();
-    });
-  });
-
-  test('renders empty search state', async () => {
-    formService.getAllForms
-      .mockResolvedValueOnce(mockFormsResponse)
-      .mockResolvedValueOnce({ data: [], totalCount: 0, totalPages: 0 });
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText('Search');
-    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
-
-    await waitFor(() => {
-      expect(screen.getByText('No forms found')).toBeInTheDocument();
-      expect(screen.getByText(/No forms match your search/)).toBeInTheDocument();
-    });
-  });
-
-  test('handles response structure as direct array', async () => {
-    formService.getAllForms.mockResolvedValue([
-      mockFormsResponse.data[0],
-      mockFormsResponse.data[1]
-    ]);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-      expect(screen.getByText('Published Form')).toBeInTheDocument();
-    });
-  });
-
-  test('handles unexpected response structure', async () => {
-    formService.getAllForms.mockResolvedValue({ unexpected: 'structure' });
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('No forms found')).toBeInTheDocument();
-    });
-  });
-
-  test('handles no response', async () => {
-    formService.getAllForms.mockResolvedValue(null);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('No forms found')).toBeInTheDocument();
-    });
-  });
-
-  test('handles missing form data fields', async () => {
-    const incompleteResponse = {
-      data: [
-        { formId: 'form-3' }, // Missing most fields
-        {
-          formId: 'form-4',
-          title: null,
-          status: 1,
-          publishedBy: null,
-          publishedAt: null
-        }
-      ],
-      totalCount: 2,
-      totalPages: 1
-    };
-
-    formService.getAllForms.mockResolvedValue(incompleteResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Untitled Form')).toBeInTheDocument();
-      expect(screen.getAllByText('N/A')).toHaveLength(2); // For missing dates
-    });
-  });
-
-  test('renders loading spinner initially', () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    expect(screen.getByTestId('loading-spinner')).toBeInTheDocument();
-  });
-
-  test('renders search loading state', async () => {
-    formService.getAllForms.mockImplementation(
-      () => new Promise(resolve => setTimeout(() => resolve(mockFormsResponse), 100))
-    );
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText('Search');
-    fireEvent.change(searchInput, { target: { value: 'searching' } });
-
-    expect(screen.getByText('Searching for "searching"...')).toBeInTheDocument();
-  });
-
-  test('handles error checking responses', async () => {
-    formService.getFormResponses.mockRejectedValue(new Error('Failed to get responses'));
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Published Form')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[1]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    await waitFor(() => {
-            expect(screen.getByTestId('modal')).toBeInTheDocument();
-    });
-  });
-
-  test('handles delete with custom message', async () => {
-    formService.deleteForm.mockResolvedValue({ 
-      success: true, 
-      message: 'Custom delete message' 
-    });
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    const confirmButton = screen.getByText('Confirm');
-    fireEvent.click(confirmButton);
-
-    await waitFor(() => {
-      expect(toast.success).toHaveBeenCalledWith('Custom delete message');
-    });
-  });
-
-  test('handles response data without totalCount', async () => {
-    const responseWithoutCount = {
-      data: mockFormsResponse.data
-    };
-
-    formService.getAllForms.mockResolvedValue(responseWithoutCount);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-  });
-
-  test('handles response with undefined totalPages', async () => {
-    const responseWithoutTotalPages = {
-      data: mockFormsResponse.data,
-      totalCount: 20
-    };
-
-    formService.getAllForms.mockResolvedValue(responseWithoutTotalPages);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-  });
-
-  test('initializes enabled status for forms without formId', async () => {
-    const responseWithoutFormId = {
-      data: [
-        { title: 'Form without ID', status: 1 }
-      ],
-      totalCount: 1,
-      totalPages: 1
-    };
-
-    formService.getAllForms.mockResolvedValue(responseWithoutFormId);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Form without ID')).toBeInTheDocument();
-    });
-  });
-
-  test('handles page change with invalid page number', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    // handlePageChange with page 0
-    // This is tested indirectly through the disabled prev button
-    const prevButton = screen.getByText('‹');
-    expect(prevButton).toBeDisabled();
-  });
-
-  test('cancels delete operation', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    fireEvent.click(menuButtons[0]);
-
-    const deleteButton = screen.getByText('Delete');
-    fireEvent.click(deleteButton);
-
-    const cancelButton = screen.getByText('Cancel');
-    fireEvent.click(cancelButton);
-
-    expect(formService.deleteForm).not.toHaveBeenCalled();
-  });
-
-  test('handles menu dots click with stopPropagation', async () => {
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    const menuButtons = screen.getAllByLabelText('More options');
-    const event = { stopPropagation: jest.fn() };
-    
-    fireEvent.click(menuButtons[0], event);
-    expect(screen.getByText('Edit')).toBeInTheDocument();
-  });
-
-  test('handles page numbers with ellipsis at start', async () => {
-    const manyPagesResponse = {
-      ...mockFormsResponse,
-      totalCount: 100,
-      totalPages: 10,
-      pageNumber: 1
-    };
-
-    formService.getAllForms.mockResolvedValue(manyPagesResponse);
-
-    render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Test Form 1')).toBeInTheDocument();
-    });
-
-    // Should show 1 2 3 4 ... 10 for page 1
-    expect(screen.getByText('1')).toBeInTheDocument();
-    expect(screen.getByText('4')).toBeInTheDocument();
-    expect(screen.getByText('...')).toBeInTheDocument();
-    expect(screen.getByText('10')).toBeInTheDocument();
-  });
-
-  test('unmounts and cleans up event listeners', () => {
-    const removeEventListenerSpy = jest.spyOn(document, 'removeEventListener');
-
-    const { unmount } = render(
-      <BrowserRouter>
-        <FormList />
-      </BrowserRouter>
-    );
-
-    unmount();
-
-    expect(removeEventListenerSpy).toHaveBeenCalledWith('click', expect.any(Function));
   });
 });
 

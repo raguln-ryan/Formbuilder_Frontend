@@ -7,27 +7,28 @@ import { togglePreview, setShowPublishModal } from '../../store/slices/formBuild
 import '../../styles/components/FormBuilder/FormEditor.css';
 
 const FormLayout = ({
-  formData,
-  questions,
-  onQuestionsChange,
   onSaveAsDraft,
   onPublish,
   saving
 }) => {
   const dispatch = useDispatch();
-  const { showPreview, showPublishModal } = useSelector(state => state.formBuilder);
   
-  // Original toggle preview logic
+  // GET DATA FROM REDUX STORE
+  const { 
+    formData,
+    questions,
+    showPreview, 
+    showPublishModal 
+  } = useSelector(state => state.formBuilder);
+  
   const handleTogglePreview = () => {
     dispatch(togglePreview());
   };
   
-  // Original publish click logic
   const handlePublishClick = () => {
     dispatch(setShowPublishModal(true));
   };
   
-  // Original confirm publish logic
   const confirmPublish = () => {
     dispatch(setShowPublishModal(false));
     onPublish();
@@ -52,14 +53,8 @@ const FormLayout = ({
           </div>
         ) : null}
 
-        <SectionEditor
-          questions={questions}
-          onQuestionsChange={onQuestionsChange}
-          formTitle={formData.title}
-          formDescription={formData.description}
-        />
+        <SectionEditor />  {/* NO PROPS NEEDED */}
 
-        {/* Only show bottom actions when NOT in preview mode */}
         {!showPreview && (
           <div className="form-config-actions-wrapper">
             <button
@@ -88,7 +83,6 @@ const FormLayout = ({
           </div>
         )}
 
-        {/* Publish Confirmation Modal */}
         <Modal
           isOpen={showPublishModal}
           onClose={() => dispatch(setShowPublishModal(false))}

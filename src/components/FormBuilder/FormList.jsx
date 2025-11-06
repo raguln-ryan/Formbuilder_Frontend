@@ -1,168 +1,198 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../../contexts/AuthContext';
-import formService from '../../services/formService';
+import { debounce } from 'lodash';
 import Button from '../Common/Button';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import Modal from '../Common/Modal';
 import '../../styles/components/FormBuilder/FormList.css';
 import searchIcon from '../../assets/Ellipse.png';
-import toast from 'react-hot-toast';
-import { debounce } from 'lodash'; // Install lodash if not already: npm install lodash
+import {
+  fetchForms,
+  deleteForm,
+  checkFormResponses,
+  toggleFormEnabled,
+  setSearchTerm,
+  setPage,
+  setPageSize,
+  setActiveMenu,
+  openDeleteModal,
+  closeDeleteModal,
+  resetFormList
+} from '../../store/slices/formListSlice';
 
 const FormList = () => {
-  const [forms, setForms] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, formId: null });
-  const [error, setError] = useState(null);
-  const [activeMenu, setActiveMenu] = useState(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  
-  // State to track enabled/disabled status for each form
-  const [formEnabledStatus, setFormEnabledStatus] = useState({});
-  
-  // Updated pagination states - using page instead of currentPage for consistency
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
-  const [totalItems, setTotalItems] = useState(0);
-  const [totalPages, setTotalPages] = useState(0);
-  
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
+  // Redux selectors
+  const {
+    forms,
+    searchTerm,
+    loading,
+    error,
+    deleteModal,
+    activeMenu,
+    isDeleting,
+    formEnabledStatus,
+    pagination
+  } = useSelector((state) => state.formList);
+
+  const { page, pageSize, totalItems, totalPages } = pagination;
+
+  // Authentication check
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'Admin') {
       navigate('/login');
     }
   }, [isAuthenticated, user, navigate]);
 
-  // Fetch forms when page, pageSize, or searchTerm changes
+  // Initial load and cleanup
   useEffect(() => {
-    fetchForms();
-  }, [page, pageSize]);
+    return () => {
+      dispatch(resetFormList());
+    };
+  }, [dispatch]);
+
+  // Fetch forms when page or pageSize changes
+  useEffect(() => {
+    dispatch(fetchForms({ page, pageSize, searchTerm }));
+  }, [dispatch, page, pageSize]);
 
   // Create a debounced search function
   const debouncedSearch = useCallback(
     debounce((searchValue) => {
-      setPage(1); // Reset to first page on search
-      fetchForms(1, pageSize, searchValue);
-    }, 500),
-    [pageSize]
+      dispatch(setPage(1));
+      dispatch(fetchForms({ page: 1, pageSize, searchTerm: searchValue }));
+    }, 300),
+    [dispatch, pageSize]
   );
 
   // Handle search input change
   const handleSearchChange = (e) => {
     const value = e.target.value;
-    setSearchTerm(value);
+    dispatch(setSearchTerm(value));
     debouncedSearch(value);
   };
 
-  const fetchForms = async (pageNum = page, size = pageSize, search = searchTerm) => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-
-      // Call the service with the correct parameters
-      const response = await formService.getAllForms(pageNum, size, search);
-
-      
-      console.log('Raw API Response:', response); // Debug log
-      
-      if (response) {
-
-
-
-
-        let formsData = [];
-        let total = 0;
-        
-
-        // Handle the response structure from your C# backend
-        // Backend returns: { data: [...], totalCount: 14, pageNumber: 1, pageSize: 10, totalPages: 2 }
-        if (response.data && Array.isArray(response.data)) {
-          // This is the correct structure from your backend
-          formsData = response.data;
-          total = response.totalCount || formsData.length;
-          
-          // Set total pages from response or calculate it
-          if (response.totalPages !== undefined) {
-            setTotalPages(response.totalPages);
-          } else {
-            setTotalPages(Math.ceil(total / size));
-          }
-          
-          console.log(`Loaded ${formsData.length} forms out of ${total} total`);
-        } else if (Array.isArray(response)) {
-          // Fallback if response is array directly (shouldn't happen with PaginatedResponse)
-          formsData = response;
-          total = response.length;
-          setTotalPages(Math.ceil(total / size));
-        } else {
-          console.error('Unexpected response structure:', response);
-          formsData = [];
-          total = 0;
-          setTotalPages(0);
-        }
-        
-        setForms(formsData);
-        setTotalItems(total);
-
-        
-        // Initialize enabled status for each form
-        const initialStatus = {};
-
-
-        formsData.forEach(form => {
-          // Use the correct field name based on your backend response
-          const formId = form.formId;  // Your backend returns 'formId' field
-          if (formId) {
-            initialStatus[formId] = form.isEnabled || false;
-          }
-        });
-        setFormEnabledStatus(initialStatus);
-        
-      } else {
-        console.log('No response received');
-        setForms([]);
-        setTotalItems(0);
-        setTotalPages(0);
-        setFormEnabledStatus({});
-      }
-    } catch (err) {
-
-      console.error('Error in fetchForms:', err);
-      toast.error('Error loading forms: ' + (err.response?.data?.message || err.message || 'Unknown error'));
-      setError('Failed to load forms. Please try again.');
-      setForms([]);
-      setTotalItems(0);
-      setTotalPages(0);
-    } finally {
-      setLoading(false);
-    }
+  // Clear search
+  const handleClearSearch = () => {
+    dispatch(setSearchTerm(''));
+    dispatch(setPage(1));
+    dispatch(fetchForms({ page: 1, pageSize, searchTerm: '' }));
   };
 
+  // Pagination handlers
   const handlePageChange = (newPage) => {
     if (newPage >= 1 && newPage <= totalPages) {
-      setPage(newPage);
+      dispatch(setPage(newPage));
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
   const handlePageSizeChange = (e) => {
     const newPageSize = parseInt(e.target.value);
-    setPageSize(newPageSize);
-    setPage(1);
+    dispatch(setPageSize(newPageSize));
   };
 
-  // Clear search
-  const handleClearSearch = () => {
-    setSearchTerm('');
-    setPage(1);
-    fetchForms(1, pageSize, '');
+  // Menu handlers
+  const toggleMenu = (formId, e) => {
+    e.stopPropagation();
+    dispatch(setActiveMenu(activeMenu === formId ? null : formId));
   };
 
+  // Form actions
+  const handleEdit = (formId) => {
+    navigate(`/form/${formId}/edit`);
+    dispatch(setActiveMenu(null));
+  };
+
+  const handleViewResponses = (formId) => {
+    navigate(`/form/${formId}/view`, { state: { activeTab: 'responses' } });
+    dispatch(setActiveMenu(null));
+  };
+
+  const handleViewForm = (formId) => {
+    navigate(`/form/${formId}/view`, { state: { activeTab: 'configuration' } });
+    dispatch(setActiveMenu(null));
+  };
+
+  const handleToggleEnable = (formId) => {
+    const currentForm = forms.find(f => f.formId === formId);
+    dispatch(toggleFormEnabled({ 
+      formId, 
+      currentStatus: currentForm?.isEnabled 
+    }));
+  };
+
+  const handlePublish = async (formId) => {
+    // Add your publish logic here
+    dispatch(setActiveMenu(null));
+  };
+
+  // Delete handlers
+  const handleDeleteClick = async (formId) => {
+    const form = forms.find(f => f.formId === formId);
+    
+    // Prepare modal data
+    const modalData = {
+      formId,
+      formTitle: form?.title || 'this form',
+      formStatus: form?.status
+    };
+
+    // Check for responses if published
+    if (form?.status === 1) {
+      const result = await dispatch(checkFormResponses({ formId }));
+      if (checkFormResponses.fulfilled.match(result)) {
+        modalData.hasResponses = result.payload.hasResponses;
+        modalData.responseCount = result.payload.responseCount;
+      }
+    }
+    
+    dispatch(openDeleteModal(modalData));
+  };
+
+  const handleDelete = async () => {
+    if (isDeleting) return;
+    
+    const { formId, formTitle } = deleteModal;
+    dispatch(closeDeleteModal());
+    
+    const result = await dispatch(deleteForm({ formId, formTitle }));
+    
+    if (deleteForm.fulfilled.match(result)) {
+      // Check if we need to refresh after page adjustment
+      const remainingItems = totalItems - 1;
+      const newTotalPages = Math.ceil(remainingItems / pageSize);
+      
+      if (page > newTotalPages && newTotalPages > 0) {
+        // Page will be adjusted in the reducer
+        setTimeout(() => {
+          dispatch(fetchForms({ page: newTotalPages, pageSize, searchTerm }));
+        }, 500);
+      } else {
+        setTimeout(() => {
+          dispatch(fetchForms({ page, pageSize, searchTerm }));
+        }, 500);
+      }
+    }
+  };
+
+  // Close menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('.menu-container')) {
+        dispatch(setActiveMenu(null));
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [dispatch]);
+
+  // Get page numbers for pagination
   const getPageNumbers = () => {
     const pages = [];
     const maxPagesToShow = 5;
@@ -198,135 +228,20 @@ const FormList = () => {
     return pages;
   };
 
-  const handleDeleteClick = async (formId) => {
-    const form = forms.find(f => f.formId === formId);
-    
-    let hasResponses = false;
-    let responseCount = 0;
-    
-    if (form?.status === 1) {
-      try {
-        // Updated to use the new API signature with pagination
-        const responses = await formService.getFormResponses(formId, 1, 100);
-        const responseData = responses.data || responses;
-        hasResponses = responseData.length > 0;
-        responseCount = responses.totalCount || responseData.length || 0;
-      } catch (error) {
-        console.error('Error checking responses:', error);
-      }
-    }
-    
-    setDeleteModal({ 
-      isOpen: true, 
-      formId, 
-      formTitle: form?.title || 'this form',
-      hasResponses,
-      responseCount,
-      formStatus: form?.status
-    });
-    setActiveMenu(null);
-  };
-
-  const handleDelete = async () => {
-    if (isDeleting) return;
-    
-    const { formId, formTitle } = deleteModal;
-    
-    try {
-      setIsDeleting(true);
-      setDeleteModal({ isOpen: false, formId: null });
-      
-      const loadingToast = toast.loading(`Deleting form "${formTitle}"...`);
-      
-      const result = await formService.deleteForm(formId);
-      console.log('Delete result:', result);
-      
-      toast.dismiss(loadingToast);
-      
-      if (result.success) {
-        toast.success(result.message || `Form deleted successfully`);
-        
-        const remainingItems = totalItems - 1;
-        const newTotalPages = Math.ceil(remainingItems / pageSize);
-        
-        if (page > newTotalPages && newTotalPages > 0) {
-          setPage(newTotalPages);
-        } else {
-          setTimeout(() => {
-            fetchForms();
-          }, 500);
-        }
-      }
-    } catch (error) {
-      console.error('Error in handleDelete:', error);
-      const errorMessage = error.message || 'Failed to delete form';
-      toast.error(errorMessage);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const toggleMenu = (formId, e) => {
-    e.stopPropagation();
-    setActiveMenu(activeMenu === formId ? null : formId);
-  };
-
-  const handleEdit = (formId) => {
-    navigate(`/form/${formId}/edit`);
-    setActiveMenu(null);
-  };
-
-  const handleViewResponses = (formId) => {
-    navigate(`/form/${formId}/view`, { state: { activeTab: 'responses' } });
-    setActiveMenu(null);
-  };
-
-  const handleViewForm = (formId) => {
-    // Change 'questions' to 'configuration' to match the actual tab name
-    navigate(`/form/${formId}/view`, { state: { activeTab: 'configuration' } });
-    setActiveMenu(null);
-  };
-
-  const handleToggleEnable = (formId) => {
-    const updateFormEnabled = (formsList) => 
-      formsList.map(form => 
-        form.formId === formId 
-          ? { ...form, isEnabled: !form.isEnabled } 
-          : form
-      );
-    
-    setForms(updateFormEnabled);
-    
-    const currentForm = forms.find(f => f.formId === formId);
-    const newStatus = !currentForm?.isEnabled;
-    
-    toast.success(`Form ${newStatus ? 'enabled' : 'disabled'}`);
-  };
-
-  const handlePublish = async (formId) => {
-    // Add your publish logic here
-    setActiveMenu(null);
-  };
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (!e.target.closest('.menu-container')) {
-        setActiveMenu(null);
-      }
-    };
-    document.addEventListener('click', handleClickOutside);
-    return () => document.removeEventListener('click', handleClickOutside);
-  }, []);
-
+  // Loading state
   if (loading && !searchTerm) return <LoadingSpinner />;
 
+  // Error state
   if (error) {
     return (
       <div className="form-list-container">
         <div className="error-state">
           <h3>Error</h3>
           <p>{error}</p>
-          <button onClick={() => fetchForms()} className="create-form-btn">
+          <button 
+            onClick={() => dispatch(fetchForms({ page, pageSize, searchTerm }))} 
+            className="create-form-btn"
+          >
             Retry
           </button>
         </div>
@@ -339,7 +254,6 @@ const FormList = () => {
       <div className="form-list-header">
         <h2>Form List</h2>
         <div className="form-list-actions">
-          {/* Updated search bar with server-side search */}
           <div className="search-bar">
             <img src={searchIcon} alt="Search" className="search-icon" />
             <input
@@ -349,7 +263,6 @@ const FormList = () => {
               onChange={handleSearchChange}
               className="form-search-input"
             />
-            
           </div>
 
           <button
@@ -389,13 +302,10 @@ const FormList = () => {
         </div>
       ) : (
         <>
-         
-
           <div className="form-grid">
             {forms.map((form) => (
               <div key={form.formId} className="form-card">
                 <div className="menu-container">
-                  
                   {activeMenu === form.formId && (
                     <div className="dropdown-menu">
                       {form.status === 0 ? (
@@ -425,19 +335,18 @@ const FormList = () => {
                 </div>
 
                 <div className="form-card-content">
-
-                  <h3 className="form-name">{form.title || 'Untitled Form'}
+                  <h3 className="form-name">
+                    {form.title || 'Untitled Form'}
                     <button
-                    className="menu-dots"
-                    onClick={(e) => toggleMenu(form.formId, e)}
-                    aria-label="More options"
-                  >
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                  </button>
+                      className="menu-dots"
+                      onClick={(e) => toggleMenu(form.formId, e)}
+                      aria-label="More options"
+                    >
+                      <span></span>
+                      <span></span>
+                      <span></span>
+                    </button>
                   </h3>
-                  
 
                   <div className="form-details">
                     {form.status === 0 ? (
@@ -465,7 +374,7 @@ const FormList = () => {
                           <span className="form-detail-label">Published date:</span>
                           <span>
                             {form.publishedAt
-                               ? new Date(form.createdAt).toLocaleDateString()
+                              ? new Date(form.createdAt).toLocaleDateString()
                               : 'N/A'}
                           </span>
                         </div>
@@ -505,19 +414,63 @@ const FormList = () => {
                       View Responses
                     </button>
                   </div>
-
                 </div>
               </div>
             ))}
           </div>
 
-         
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pagination-container">
+              <div className="pagination-info">
+                <span>Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, totalItems)} of {totalItems} forms</span>
+                <select value={pageSize} onChange={handlePageSizeChange} className="page-size-select">
+                  <option value="5">5 per page</option>
+                  <option value="10">10 per page</option>
+                  <option value="20">20 per page</option>
+                  <option value="50">50 per page</option>
+                </select>
+              </div>
+
+              <div className="pagination-buttons">
+                <button 
+                  onClick={() => handlePageChange(page - 1)} 
+                  disabled={page === 1}
+                  className="pagination-btn"
+                >
+                  Previous
+                </button>
+                
+                {getPageNumbers().map((pageNum, index) => (
+                  pageNum === '...' ? (
+                    <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+                  ) : (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`pagination-btn ${page === pageNum ? 'active' : ''}`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                ))}
+                
+                <button 
+                  onClick={() => handlePageChange(page + 1)} 
+                  disabled={page === totalPages}
+                  className="pagination-btn"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
 
       <Modal
         isOpen={deleteModal.isOpen}
-        onClose={() => setDeleteModal({ isOpen: false, formId: null })}
+        onClose={() => dispatch(closeDeleteModal())}
         onConfirm={handleDelete}
         title={`Delete ${deleteModal.formTitle || 'Form'}`}
         message={
@@ -528,9 +481,8 @@ const FormList = () => {
             : "Are you sure you want to delete this draft form? This action cannot be undone."
         }
         variant="danger"
-        confirmText={"Yes, Delete"}
+        confirmText="Yes, Delete"
       />
-
     </div>
   );
 };

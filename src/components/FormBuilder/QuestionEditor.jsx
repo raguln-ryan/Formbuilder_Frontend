@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { updateQuestion, deleteQuestion, duplicateQuestion } from '../../store/slices/formBuilderSlice';
 import Input from '../Common/Input';
 import Button from '../Common/Button';
 import '../../styles/components/FormBuilder/QuestionEditor.css';
@@ -10,31 +12,28 @@ import file from './../../assets/file.png';
 const QuestionEditor = ({
   question,
   index,
-  totalQuestions,
   isEditing,
-  onUpdate,
-  onDelete,
-  onMove,
-  onDuplicate,
   onDragStart,
   onDragEnd,
   onDragOver,
   onDrop,
   isDragging
 }) => {
+  const dispatch = useDispatch();
+  const { questions } = useSelector(state => state.formBuilder);
+  const totalQuestions = questions.length;
+  
   const [localQuestion, setLocalQuestion] = useState(question);
 
-  // Update local question when prop changes
   useEffect(() => {
     setLocalQuestion(question);
   }, [question]);
 
-  console.log(localQuestion)
-
   const handleFieldChange = (field, value) => {
     const updated = { ...localQuestion, [field]: value };
     setLocalQuestion(updated);
-    onUpdate(updated); // This updates the parent component
+    // DISPATCH TO REDUX
+    dispatch(updateQuestion({ index, question: updated }));
   };
 
   const handleOptionChange = (optionIndex, value) => {
@@ -59,8 +58,7 @@ const QuestionEditor = ({
   };
 
   const handleDuplicate = (e) => {
-    e.stopPropagation(); // Prevent triggering edit mode
-    // Create a copy of the question with a new ID
+    e.stopPropagation();
     const duplicatedQuestion = {
       ...localQuestion,
       _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -70,12 +68,14 @@ const QuestionEditor = ({
         _id: `opt_${Date.now()}_${Math.random()}`
       }))
     };
-    onDuplicate(duplicatedQuestion);
+    // DISPATCH TO REDUX
+    dispatch(duplicateQuestion(duplicatedQuestion));
   };
 
   const handleDeleteClick = (e) => {
-    e.stopPropagation(); // Prevent triggering edit mode
-    onDelete();
+    e.stopPropagation();
+    // DISPATCH TO REDUX
+    dispatch(deleteQuestion(index));
   };
 
   const getQuestionTypeLabel = (type) => {
@@ -109,8 +109,6 @@ const QuestionEditor = ({
     }
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/html', e.target.innerHTML);
-
-    // Add dragging class to the entire question editor
     e.target.closest('.question-editor')?.classList.add('is-dragging');
   };
 
@@ -132,10 +130,7 @@ const QuestionEditor = ({
 
   const handleDragEnd = (e) => {
     e.preventDefault();
-
-    // Remove dragging class
     e.target.closest('.question-editor')?.classList.remove('is-dragging');
-
     if (onDragEnd) {
       onDragEnd();
     }
@@ -146,7 +141,7 @@ const QuestionEditor = ({
   const isFileUpload = localQuestion.type === 'file_upload';
   const isDropdown = localQuestion.type === 'choice';
 
-  // Render display mode (when not editing)
+  // Render display mode
   const renderDisplayMode = () => {
     return (
       <div className="question-display-mode">
@@ -175,7 +170,7 @@ const QuestionEditor = ({
           </div>
         ))}
 
-        {isFileUpload ? (
+        {isFileUpload && (
           <div className="file-upload-display">
             <img src={file} alt="File Upload" className="file-icon" />
             <div className="file-info">
@@ -183,12 +178,13 @@ const QuestionEditor = ({
               <p className="file-support">Supported files: PDF, PNG, JPG | Max file size 2 MB</p>
             </div>
           </div>
-        ) : <></>}
+        )}
       </div>
     );
   };
 
-  // Render edit mode (when editing)
+  // Render edit mode remains the same with the rest of your component...
+   // Render edit mode
   const renderEditMode = () => {
     return (
       <div className="question-body" onClick={(e) => e.stopPropagation()}>
@@ -232,30 +228,22 @@ const QuestionEditor = ({
                     localQuestion.date_format :
                     localQuestion.type === 'file_upload' ?
                     <div className="file-config-info">
-                
-              <div className="file-info-item">
-                <img src={file} alt="File Upload" className="file-icon" />
-              </div>
-              <div style={{display: 'flex', flexDirection: 'column', marginLeft: 16}}>
-                <span className="info-text">Supported files: PDF, PNG, JPG</span>
-                <span className="info-text">Max file size: 2 MB</span>
-              </div>
-              <div className="file-info-item">
-              </div>
-            </div>
-                     :
+                      <div className="file-info-item">
+                        <img src={file} alt="File Upload" className="file-icon" />
+                      </div>
+                      <div style={{display: 'flex', flexDirection: 'column', marginLeft: 16}}>
+                        <span className="info-text">Supported files: PDF, PNG, JPG</span>
+                        <span className="info-text">Max file size: 2 MB</span>
+                      </div>
+                    </div> :
                     getQuestionTypeDescription(localQuestion.type)
                 }
-
               </div>
             </div>
           </div>
 
-
-
           {localQuestion.type === 'date_picker' && (
             <div className="date-wrap">
-              {/* Date Format Radio Buttons */}
               <div className="date-format-group">
                 <span className="format-label">Date Format:</span>
                 <label className="radio-option">
@@ -282,7 +270,6 @@ const QuestionEditor = ({
             </div>
           )}
 
-          {/* Selection Type for Dropdown */}
           {isDropdown && (
             <div className="form-row">
               <label className="selection-type-label">Selection Type</label>
@@ -300,7 +287,7 @@ const QuestionEditor = ({
                         multiple_choice: false
                       };
                       setLocalQuestion(updated);
-                      onUpdate(updated); // Update parent with both fields at once
+                      dispatch(updateQuestion({ index, question: updated }));
                     }}
                     style={{ marginRight: 8 }}
                   />
@@ -319,7 +306,7 @@ const QuestionEditor = ({
                         multiple_choice: true
                       };
                       setLocalQuestion(updated);
-                      onUpdate(updated); // Update parent with both fields at once
+                      dispatch(updateQuestion({ index, question: updated }));
                     }}
                     style={{ marginRight: 8, marginLeft: 8 }}
                   />
@@ -328,12 +315,6 @@ const QuestionEditor = ({
               </div>
             </div>
           )}
-
-          {/* File Upload Configuration */}
-          {isFileUpload && (
-            <></>
-          )}
-
 
           {hasOptions && (
             <div className="options-section">
@@ -370,7 +351,6 @@ const QuestionEditor = ({
         {/* Bottom Actions Bar */}
         <div className="question-bottom-actions">
           <div className="actions-right-container">
-            {/* Copy Button */}
             <button
               className="action-button copy"
               onClick={handleDuplicate}
@@ -379,7 +359,6 @@ const QuestionEditor = ({
               <img src={elements} alt="Copy" className="action-icon" />
             </button>
 
-            {/* Delete Button */}
             <button
               className="action-button delete"
               onClick={handleDeleteClick}
@@ -388,7 +367,6 @@ const QuestionEditor = ({
               <img src={TrashBin} alt="Delete" className="action-icon" />
             </button>
 
-            {/* Description Toggle */}
             <label className="toggle-switch description-toggle">
               <span className="toggle-label">Description</span>
               <input
@@ -399,7 +377,6 @@ const QuestionEditor = ({
               <span className="toggle-slider"></span>
             </label>
 
-            {/* Required Toggle */}
             <label className="toggle-switch required-toggle">
               <span className="toggle-label">Required</span>
               <input
@@ -431,3 +408,4 @@ const QuestionEditor = ({
 };
 
 export default QuestionEditor;
+

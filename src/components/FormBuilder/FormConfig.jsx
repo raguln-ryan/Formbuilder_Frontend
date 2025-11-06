@@ -1,18 +1,44 @@
 import React from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { setFormField } from '../../store/slices/formBuilderSlice';
 import toast from 'react-hot-toast';
 
 const FormConfig = ({
-  formData,
-  onInputChange,
   onSaveAsDraft,
   onNext,
-  errors,
   saving,
-  TITLE_CHAR_LIMIT,
-  DESCRIPTION_CHAR_LIMIT,
   formId = '',
 }) => {
+  const dispatch = useDispatch();
+  
+  // GET DATA FROM REDUX
+  const {
+    formData,
+    errors,
+    TITLE_CHAR_LIMIT,
+    DESCRIPTION_CHAR_LIMIT
+  } = useSelector(state => state.formBuilder);
+  
   const isFormValid = formData.title.trim() && formData.description.trim();
+
+  const handleInputChange = (field, value) => {
+    // DISPATCH TO REDUX
+    dispatch(setFormField({ field, value }));
+    
+    // Show validation feedback
+    if (field === 'title' && value.trim() === '') {
+      toast.error('Form name is required', { id: 'title-validation' });
+    } else if (field === 'title' && value.trim()) {
+      toast.dismiss('title-validation');
+    }
+  };
+
+  const handleVisibilityToggle = (checked) => {
+    dispatch(setFormField({ field: 'isVisible', value: checked }));
+    toast.success(checked ? 'Form is now visible' : 'Form is now hidden', {
+      icon: checked ? '👁️' : '🙈',
+    });
+  };
 
   const handleSaveAsDraft = async () => {
     try {
@@ -30,24 +56,6 @@ const FormConfig = ({
     }
     toast.success('Moving to next step...');
     onNext();
-  };
-
-  const handleInputChange = (field, value) => {
-    onInputChange(field, value);
-    
-    // Show validation feedback for required fields
-    if (field === 'title' && value.trim() === '') {
-      toast.error('Form name is required', { id: 'title-validation' });
-    } else if (field === 'title' && value.trim()) {
-      toast.dismiss('title-validation');
-    }
-  };
-
-  const handleVisibilityToggle = (checked) => {
-    onInputChange('isVisible', checked);
-    toast.success(checked ? 'Form is now visible' : 'Form is now hidden', {
-      icon: checked ? '👁️' : '🙈',
-    });
   };
 
   return (
@@ -113,7 +121,6 @@ const FormConfig = ({
             </div>
           </div>
         </div>
-
 
         <div className="form-config-actions-floating">
           <div className="form-config-actions-wrapper">

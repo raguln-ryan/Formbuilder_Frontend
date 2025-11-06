@@ -7,13 +7,19 @@ import SectionEditor from '../components/FormBuilder/SectionEditor';
 import QuestionPreview from '../components/FormBuilder/QuestionPreview';
 import LoadingSpinner from '../components/Common/LoadingSpinner';
 import toast from 'react-hot-toast';
-import { 
-  fetchFormDetails, 
-  updateForm, 
-  updateFormData, 
-  updateQuestions 
-} from '../store/slices/formSlice';
+// CHANGE: Import formBuilder slice actions instead of forms slice
+import {
+  setFormData,
+  setQuestions,
+  setCurrentFormId,
+  setLoading,
+  setSaving,
+  resetForm,
+  setActiveTab as setFormBuilderActiveTab,
+  togglePreview
+} from '../store/slices/formBuilderSlice';
 import { fetchResponses } from '../store/slices/responseSlice';
+import formService from '../services/formService';
 import responseService from '../services/responseService';
 import '../styles/components/FormBuilder/FormEditor.css';
 import '../styles/pages/ViewFormPage.css';
@@ -28,14 +34,15 @@ const ViewFormPage = () => {
   const location = useLocation();
   const dispatch = useDispatch();
   
-  // Redux state
+  // CHANGE: Get data from formBuilder slice
   const { 
     formData, 
     questions, 
     loading, 
-    saving, 
-    lastFetchedFormId 
-  } = useSelector(state => state.forms);
+    saving,
+    showPreview,
+    currentFormId
+  } = useSelector(state => state.formBuilder);
   
   const { 
     responses, 
@@ -43,17 +50,12 @@ const ViewFormPage = () => {
     loading: responsesLoading 
   } = useSelector(state => state.responses);
   
-  // FIX: Check if location.state has a valid tab, otherwise default to 'configuration'
   const initialTab = location.state?.activeTab && 
     ['configuration', 'layout', 'responses'].includes(location.state.activeTab) 
     ? location.state.activeTab 
     : 'configuration';
   
   const [activeTab, setActiveTab] = useState(initialTab);
-  
-  // Other local states remain same...
-  const [showPreview, setShowPreview] = useState(false);
-  const [errors, setErrors] = useState({});
   const [responseView, setResponseView] = useState('summary');
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,30 +67,73 @@ const ViewFormPage = () => {
   const TITLE_CHAR_LIMIT = 100;
   const DESCRIPTION_CHAR_LIMIT = 500;
 
-  // Add this after your useSelector hooks to debug
-  useEffect(() => {
-    console.log('ViewFormPage - Current State:', {
-      formData,
-      questions,
-      loading,
-      formId
-    });
-  }, [formData, questions, loading, formId]);
-
-  // Also log when fetching
+  // Fetch form details on mount
   useEffect(() => {
     if (formId) {
-      console.log('Fetching form details for ID:', formId);
-      dispatch(fetchFormDetails(formId));
+      console.log('ViewFormPage - Fetching form details for ID:', formId);
+      fetchFormDetails();
     }
-  }, [formId, dispatch]);
+    
+    // Cleanup when leaving the page
+    return () => {
+      dispatch(resetForm());
+    };
+  }, [formId]);
 
-  // Debug log to see what's happening
-  useEffect(() => {
-    console.log('Active Tab:', activeTab);
-    console.log('Form Data:', formData);
-    console.log('Loading:', loading);
-  }, [activeTab, formData, loading]);
+  // CHANGE: Fetch form details into formBuilder slice
+  const fetchFormDetails = async () => {
+    try {
+      dispatch(setLoading(true));
+      
+      const response = await formService.getFormById(formId);
+      console.log('ViewFormPage - Raw API Response:', response);
+      
+      if (response) {
+        // Set form data in formBuilder slice
+        dispatch(setFormData({
+          title: response.title || '',
+          description: response.description || '',
+          isVisible: response.isVisible !== undefined ? response.isVisible : true,
+          status: response.status || 0
+        }));
+        
+        // Format and set questions
+        let questionsData = response.questions || [];
+        console.log('ViewFormPage - Questions from API:', questionsData);
+        
+        if (Array.isArray(questionsData) && questionsData.length > 0) {
+          const formattedQuestions = questionsData.map((q, index) => ({
+            _id: q.id || q.questionId || q._id || `q_${Date.now()}_${index}`,
+            type: q.type || 'short_text',
+            question: q.text || q.question || q.questionText || '',
+            description_enabled: q.descriptionEnabled || false,
+            description: q.description || '',
+            required: q.required || false,
+            order: q.order !== undefined ? q.order : index,
+            enabled: q.enabled !== undefined ? q.enabled : true,
+            format: q.format || null,
+            date_format: q.format || 'DD/MM/YYYY',
+            maxLength: q.maxLength || null,
+            options: q.options || [],
+            single_choice: q.singleChoice || false,
+            multiple_choice: q.multipleChoice || false
+          }));
+          
+          console.log('ViewFormPage - Formatted questions:', formattedQuestions);
+          dispatch(setQuestions(formattedQuestions));
+        } else {
+          dispatch(setQuestions([]));
+        }
+        
+        dispatch(setCurrentFormId(formId));
+      }
+    } catch (error) {
+      console.error('Failed to fetch form details:', error);
+      toast.error('Failed to load form details');
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
 
   // Fetch responses when responses tab is activated
   useEffect(() => {
@@ -106,7 +151,6 @@ const ViewFormPage = () => {
   const getAnswerValue = (question, questionIndex, responseData) => {
     if (!responseData) return '';
     
-    // Check details array (this is what the API returns)
     if (responseData.details && Array.isArray(responseData.details)) {
       const detail = responseData.details.find(d => 
         String(d.questionId) === String(question._id) || 
@@ -115,13 +159,11 @@ const ViewFormPage = () => {
       );
       
       if (detail) {
-        // Handle file uploads
         if (detail.answer && detail.answer.includes('[FILE_UPLOADED:')) {
           const fileName = detail.answer.replace('[FILE_UPLOADED:', '').replace(']', '');
           return fileName;
         }
         
-        // Handle option selections
         if (detail.answer && detail.answer.startsWith('[') && detail.answer.includes('"')) {
           try {
             const optionIds = JSON.parse(detail.answer);
@@ -135,7 +177,6 @@ const ViewFormPage = () => {
       }
     }
     
-    // Fallback to answers array if it exists
     if (responseData.answers && Array.isArray(responseData.answers)) {
       const answer = responseData.answers.find(a => {
         return String(a.questionId) === String(question._id) || 
@@ -150,7 +191,6 @@ const ViewFormPage = () => {
     return '';
   };
 
-  // Format date helper
   const formatDate = (date) => {
     if (!date) return '-';
     const d = new Date(date);
@@ -161,11 +201,9 @@ const ViewFormPage = () => {
     });
   };
 
-  // Render answer based on question type
   const renderAnswer = (question, questionIndex, responseData) => {
     const answerValue = getAnswerValue(question, questionIndex, responseData);
     
-    // For file upload questions
     if (question.type === 'file_upload' || question.type === 'file') {
       if (answerValue && answerValue !== '') {
         return (
@@ -177,14 +215,12 @@ const ViewFormPage = () => {
       return <span className="no-answer">No file uploaded</span>;
     }
     
-    // For date questions
     if (question.type === 'date' || question.type === 'date_picker') {
       if (answerValue && answerValue !== '-') {
         return formatDate(answerValue);
       }
     }
     
-    // For option-based questions
     if ((question.type === 'checkbox' || question.type === 'radio' || question.type === 'dropdown') && 
         question.options && question.options.length > 0) {
       if (answerValue && answerValue.includes(',')) {
@@ -204,79 +240,12 @@ const ViewFormPage = () => {
     return new Date(date).toLocaleString();
   };
 
-  const handleInputChange = (field, value) => {
-    dispatch(updateFormData({ [field]: value }));
-    setErrors(prev => ({ ...prev, [field]: '' }));
-  };
-
-  const handleQuestionsChange = (updatedQuestions) => {
-    const fixedQuestions = updatedQuestions.map(q => {
-      if (!q.question && (q.questionText || q.text || q.title)) {
-        return {
-          ...q,
-          question: q.questionText || q.text || q.title
-        };
-      }
-      return q;
-    });
-    
-    dispatch(updateQuestions(fixedQuestions));
-  };
-
+  // CHANGE: These functions are now disabled in view mode
   const handleSave = async () => {
-    try {
-      if (!formData.title?.trim()) {
-        toast.error('Form title is required');
-        return;
-      }
-      
-      const formattedQuestions = questions.map((q, index) => {
-        const questionValue = q.question || q.questionText || q.text || '';
-        
-        return {
-          id: q._id || q.questionId,
-          questionId: q._id || q.questionId,
-          type: q.type || 'short_text',
-          text: questionValue,
-          question: questionValue,
-          questionText: questionValue,
-          descriptionEnabled: q.description_enabled || false,
-          description: q.description || '',
-          singleChoice: false,
-          multipleChoice: false,
-          required: q.required || false,
-          order: index,
-          enabled: true,
-          format: q.format || null,
-          maxLength: q.maxLength || null,
-          options: q.options || []
-        };
-      });
-      
-      const updateData = {
-        formId: formId,
-        title: formData.title,
-        description: formData.description,
-        status: formData.status || 0,
-        questions: formattedQuestions
-      };
-      
-      const resultAction = await dispatch(updateForm({ formId, updateData }));
-      
-      if (updateForm.fulfilled.match(resultAction)) {
-        toast.success('Form saved successfully!');
-        dispatch(fetchFormDetails(formId));
-      } else {
-        toast.error('Failed to save form');
-      }
-    } catch (err) {
-      console.error('Error saving form:', err);
-      toast.error(`Failed to save form: ${err.message || 'Please try again.'}`);
-    }
+    toast.info('Cannot edit in view mode');
   };
 
   const handleTabChange = (tab) => {
-    // Add a small delay to ensure state is updated
     setTimeout(() => {
       setActiveTab(tab);
       if (tab === 'responses' && responses.length === 0) {
@@ -291,7 +260,7 @@ const ViewFormPage = () => {
   };
 
   const handlePreview = () => {
-    setShowPreview(true);
+    dispatch(togglePreview());
   };
 
   const handleViewResponse = (responseId) => {
@@ -318,52 +287,6 @@ const ViewFormPage = () => {
     }
   };
 
-  // Filter and sort responses
-  const getFilteredResponses = () => {
-    let filtered = [...responses];
-    
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(r => 
-        r.submittedBy?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        r.userId?.toString().includes(searchTerm) ||
-        r.email?.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    
-    // Sort
-    filtered.sort((a, b) => {
-      let aVal = a[sortField];
-      let bVal = b[sortField];
-      
-      if (sortField === 'submittedAt') {
-        aVal = new Date(aVal);
-        bVal = new Date(bVal);
-      }
-      
-      if (sortDirection === 'asc') {
-        return aVal > bVal ? 1 : -1;
-      } else {
-        return aVal < bVal ? 1 : -1;
-      }
-    });
-    
-    return filtered;
-  };
-
-  // Format responses for display
-  const formattedResponses = responses.map(response => ({
-    id: response.id,
-    submittedBy: response.user?.name || response.submittedBy || 'Anonymous',
-    userId: response.userId || '-',
-    formTitle: formData.title,
-    submittedAt: response.submittedAt,
-    email: response.user?.email || response.email || '-',
-    details: response.details || [],
-    answers: response.details || []
-  }));
-
-  // Show loading only while actually loading
   if (loading && !formData.title && !questions.length) {
     return (
       <div className="view-form-page">
@@ -407,28 +330,17 @@ const ViewFormPage = () => {
         <div className="tab-content-wrapper">
           {activeTab === 'configuration' && (
             <FormConfig
-              formData={formData || { title: '', description: '', isVisible: true }}
-              onInputChange={handleInputChange}
+              formId={formId}  // Pass formId to disable editing
               onSaveAsDraft={handleSave}
               onNext={() => setActiveTab('layout')}
-              errors={errors}
-              saving={saving}
-              TITLE_CHAR_LIMIT={TITLE_CHAR_LIMIT}
-              DESCRIPTION_CHAR_LIMIT={DESCRIPTION_CHAR_LIMIT}
-              formId={formId}
+              saving={false}
             />
           )}
 
           {activeTab === 'layout' && questions && questions.length > 0 && (
             <div className="form-editor-content-area1">
               <div className="form-layout-wrapper">
-                <SectionEditor
-                  key={`section-${questions.length}`}  // Add this
-                  questions={questions || []}
-                  onQuestionsChange={handleQuestionsChange}
-                  formTitle={formData?.title || ''}
-                  formDescription={formData?.description || ''}
-                />
+                <SectionEditor formId={formId} />  {/* Pass formId to disable editing */}
                 
                 <div className="form-config-actions-wrapper">
                   <button
@@ -441,9 +353,9 @@ const ViewFormPage = () => {
                   <button
                     className="action-button action-button-primary"
                     onClick={handleSave}
-                    disabled={saving}
+                    disabled={true}
                   >
-                    {saving ? 'Saving...' : 'Save'}
+                    View Only
                   </button>
                 </div>
               </div>
@@ -452,8 +364,8 @@ const ViewFormPage = () => {
 
           {activeTab === 'layout' && (!questions || questions.length === 0) && (
             <div className="form-editor-content-area1">
-              <div className="loading-container">
-                <p>Loading questions...</p>
+              <div className="empty-state">
+                <p>No questions available for this form.</p>
               </div>
             </div>
           )}
@@ -681,7 +593,7 @@ const ViewFormPage = () => {
                     <div className="individual-responses-list">
                       <div className="responses-layout">
                         <div className="responses-left-panel">
-                          {formattedResponses.map((response) => (
+                          {responses.map((response) => (
                             <div
                               key={response.id}
                               className={`response-entry ${selectedResponse?.id === response.id ? 'selected' : ''}`}
@@ -701,7 +613,7 @@ const ViewFormPage = () => {
                         </div>
 
                         <div className="responses-right-panel">
-                          {formattedResponses.length === 0 ? (
+                          {responses.length === 0 ? (
                             <div className="empty-state">
                               <h3>No responses yet</h3>
                               <p>When users submit responses, they will appear here</p>
@@ -724,10 +636,9 @@ const ViewFormPage = () => {
                 </button>
                 <button 
                   className="save-btn"
-                  onClick={handleSave}
-                  disabled={saving}
+                  disabled={true}
                 >
-                  {saving ? 'Saving...' : 'Save Form'}
+                  View Mode Only
                 </button>
               </div>
             </div>
@@ -739,7 +650,7 @@ const ViewFormPage = () => {
             <div className="preview-modal-content">
               <div className="preview-modal-header">
                 <h2>Form Preview</h2>
-                <button className="close-preview" onClick={() => setShowPreview(false)}>×</button>
+                <button className="close-preview" onClick={handlePreview}>×</button>
               </div>
               <QuestionPreview
                 formTitle={formData.title}

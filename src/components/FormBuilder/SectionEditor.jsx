@@ -1,19 +1,14 @@
 import React from 'react';
+import { useSelector } from 'react-redux';
 import FieldsSidebar from './FieldsSidebar';
 import FormBuilderCanvas from './FormBuilderCanvas';
 import '../../styles/components/FormBuilder/SectionEditor.css';
 
-const SectionEditor = (props) => {
-  console.log('SECTION EDITOR PROPS:', props);
+const SectionEditor = ({ formId = '' }) => {
+  // GET DATA FROM REDUX
+  const { formData, questions } = useSelector(state => state.formBuilder);
   
-  // Don't destructure, pass props directly
-  const { questions, onQuestionsChange, formTitle, formDescription, formId = '' } = props;
-  
-  console.log('SECTION EDITOR RECEIVED:', {
-    questions: questions,
-    questionsLength: questions?.length,
-    formTitle: formTitle
-  });
+  console.log('SECTION EDITOR - Questions from Redux:', questions);
 
   return (
     <div className={`section-editor`}>
@@ -21,15 +16,7 @@ const SectionEditor = (props) => {
         <FieldsSidebar formId={formId}/>
       </div>
       <div className="section-editor-right">
-        {console.log('PASSING TO CANVAS - RIGHT BEFORE:', questions)}
-        <FormBuilderCanvas
-          questionsList={questions}  // Use different prop name
-          questions={questions}       // Keep original too
-          onQuestionsChange={onQuestionsChange}
-          formTitle={formTitle}
-          formDescription={formDescription}
-          formId={formId}
-        />
+        <FormBuilderCanvas formId={formId} />  {/* NO PROPS NEEDED */}
       </div>
     </div>
   );

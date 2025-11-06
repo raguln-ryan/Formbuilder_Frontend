@@ -1,57 +1,60 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import QuestionEditor from './QuestionEditor';
 import { generateId } from '../../utils/helpers';
 import Drag from './../../assets/drag.png';
 import toast from 'react-hot-toast';
+import {
+  setQuestions,
+  addQuestion,
+  updateQuestion,
+  deleteQuestion,
+  duplicateQuestion,
+  reorderQuestions,
+  setFormData
+} from '../../store/slices/formBuilderSlice';
 import '../../styles/components/FormBuilder/FormBuilderCanvas.css';
 
-const FormBuilderCanvas = ({
-  questions,
-  onQuestionsChange,
-  formTitle,
-  formDescription,
-  onHeaderChange,
-  formId = ''
-}) => {
-  // Add ALL missing state variables
+const FormBuilderCanvas = ({ formId = '' }) => {
+  const dispatch = useDispatch();
+  
+  // GET DATA FROM REDUX
+  const { 
+    formData, 
+    questions 
+  } = useSelector(state => state.formBuilder);
+  
+  // Local state for drag and drop UI
   const [draggedOver, setDraggedOver] = useState(false);
   const [draggedQuestionIndex, setDraggedQuestionIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [editingQuestionId, setEditingQuestionId] = useState(null);
   const [isDraggingFromSidebar, setIsDraggingFromSidebar] = useState(false);
+  const [isHeaderEditing, setIsHeaderEditing] = useState(false);
+  const [headerTitle, setHeaderTitle] = useState(formData.title || '');
+  const [headerDescription, setHeaderDescription] = useState(formData.description || '');
 
-  // Refs for click outside detection
   const questionRefs = useRef({});
   const headerRef = useRef(null);
 
-  const [isHeaderEditing, setIsHeaderEditing] = useState(false);
-
-  const [headerTitle, setHeaderTitle] = useState(formTitle || '');
-
-  const [headerDescription, setHeaderDescription] = useState(formDescription || '');
+  // Update header when formData changes
+  useEffect(() => {
+    setHeaderTitle(formData.title || '');
+    setHeaderDescription(formData.description || '');
+  }, [formData.title, formData.description]);
 
   // Click outside handler
   useEffect(() => {
     const handleClickOutside = (event) => {
-
       if (isHeaderEditing && headerRef.current && !headerRef.current.contains(event.target)) {
-
         setIsHeaderEditing(false);
-
-        if (onHeaderChange) {
-
-          onHeaderChange({
-
-            title: headerTitle.trim(),
-
-            description: headerDescription.trim(),
-
-          });
-
-        }
-
+        // Update Redux store
+        dispatch(setFormData({
+          title: headerTitle.trim(),
+          description: headerDescription.trim()
+        }));
       }
-      // Check if click is outside the currently editing question
+      
       if (editingQuestionId && questionRefs.current[editingQuestionId]) {
         if (!questionRefs.current[editingQuestionId].contains(event.target)) {
           setEditingQuestionId(null);
@@ -61,12 +64,11 @@ const FormBuilderCanvas = ({
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [editingQuestionId, isHeaderEditing, headerTitle, headerDescription]);
+  }, [editingQuestionId, isHeaderEditing, headerTitle, headerDescription, dispatch]);
 
   // Listen for drag events from sidebar
   useEffect(() => {
     const handleGlobalDragStart = (e) => {
-      // Check if dragging from sidebar (field type)
       if (e.dataTransfer.types.includes('fieldtype')) {
         setIsDraggingFromSidebar(true);
       }
@@ -153,10 +155,9 @@ const FormBuilderCanvas = ({
         enabled: true
       };
 
-      const newQuestions = [...questions, newQuestion];
-      onQuestionsChange(newQuestions);
+      // DISPATCH TO REDUX
+      dispatch(addQuestion(newQuestion));
       
-      // Set the new question as editing
       setEditingQuestionId(newQuestion._id);
       
       toast.success(`${fieldType.label} field added successfully!`, {
@@ -170,19 +171,13 @@ const FormBuilderCanvas = ({
   };
 
   const handleQuestionUpdate = (index, updatedQuestion) => {
-    const newQuestions = [...questions];
-    newQuestions[index] = updatedQuestion;
-    onQuestionsChange(newQuestions);
+    // DISPATCH TO REDUX
+    dispatch(updateQuestion({ index, question: updatedQuestion }));
   };
 
   const handleQuestionDelete = (index) => {
-    const newQuestions = questions
-      .filter((_, i) => i !== index)
-      .map((q, i) => ({
-        ...q,
-        order: i,
-      }));
-    onQuestionsChange(newQuestions);
+    // DISPATCH TO REDUX
+    dispatch(deleteQuestion(index));
     setEditingQuestionId(null);
     toast.success('Question deleted', { duration: 3000 });
   };
@@ -214,15 +209,8 @@ const FormBuilderCanvas = ({
   };
 
   const handleQuestionDuplicate = (duplicatedQuestion) => {
-    const questionToDuplicate = {
-      ...duplicatedQuestion,
-      _id: `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      order: questions.length
-    };
-
-    const newQuestions = [...questions, questionToDuplicate];
-    onQuestionsChange(newQuestions);
-
+    // DISPATCH TO REDUX
+    dispatch(duplicateQuestion(duplicatedQuestion));
     toast.success('Question duplicated successfully!', {
       duration: 2000,
     });
@@ -261,24 +249,12 @@ const FormBuilderCanvas = ({
       return;
     }
 
-    const newQuestions = [...questions];
-    const draggedQuestion = newQuestions[draggedQuestionIndex];
+    // DISPATCH TO REDUX
+    dispatch(reorderQuestions({
+      draggedIndex: draggedQuestionIndex,
+      dropIndex: dropIndex
+    }));
     
-    // Remove the dragged question from its original position
-    newQuestions.splice(draggedQuestionIndex, 1);
-    
-    // Insert it at the new position
-    newQuestions.splice(dropIndex, 0, draggedQuestion);
-    
-    // Update the order property for all questions
-    newQuestions.forEach((q, index) => {
-      q.order = index;
-    });
-    
-    // Update the state
-    onQuestionsChange(newQuestions);
-    
-    // Reset drag state
     setDraggedQuestionIndex(null);
     setDragOverIndex(null);
     

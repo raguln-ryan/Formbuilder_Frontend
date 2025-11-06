@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import { useAuth } from '../../contexts/AuthContext';
-import responseService from '../../services/responseService';
 import LoadingSpinner from '../Common/LoadingSpinner';
 import NavigationBar from '../Common/NavigationBar';
 import Modal from '../Common/Modal';
@@ -9,58 +9,66 @@ import toast from 'react-hot-toast';
 import '../../styles/components/Learner/FormSubmission.css';
 import success from './../../assets/success.png';
 
+// Import Redux actions and selectors
+import {
+  fetchFormDetails,
+  submitFormResponse,
+  resetFormSubmission,
+  selectCurrentForm,
+  selectFormSubmission
+} from '../../store/slices/learnerSlice';
+
 const FormSubmission = () => {
   const { formId } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const { user, isAuthenticated } = useAuth();
-  const [form, setForm] = useState(null);
+  
+  // Redux selectors
+  const currentForm = useSelector(selectCurrentForm);
+  const formSubmission = useSelector(selectFormSubmission);
+  
+  // Local state for form inputs (these don't need to be in Redux)
   const [responses, setResponses] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState({});
+  const [showClearModal, setShowClearModal] = useState(false);
   const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [submissionDetails, setSubmissionDetails] = useState(null);
-  const [showClearModal, setShowClearModal] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'Learner') {
       navigate('/login');
     } else {
-      fetchFormDetails();
+      dispatch(fetchFormDetails(formId));
     }
-  }, [isAuthenticated, user, formId]);
+  }, [isAuthenticated, user, formId, dispatch]);
 
-  const fetchFormDetails = async () => {
-    try {
-      setLoading(true);
-      const formData = await responseService.getFormById(formId);
-      console.log('Fetched form data:', formData);
-      setForm(formData);
-      
-      // Initialize responses with empty values
+  useEffect(() => {
+    // Initialize responses when form data is loaded
+    if (currentForm.data) {
       const initialResponses = {};
-      if (formData.questions && Array.isArray(formData.questions)) {
-        formData.questions.forEach(question => {
-          // Check if question is multi-select based on multiple_choice field
+      if (currentForm.data.questions && Array.isArray(currentForm.data.questions)) {
+        currentForm.data.questions.forEach(question => {
           if (question.multiple_choice === true || question.type === 'checkbox') {
             initialResponses[question.id] = [];
           } else if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
-            // Don't initialize file upload questions in responses
-            // They will be handled separately
+            // Don't initialize file upload questions
           } else {
             initialResponses[question.id] = '';
           }
         });
       }
       setResponses(initialResponses);
-    } catch (error) {
-      console.error('Error loading form:', error);
-      toast.error('Failed to load form');
-      navigate('/learner/dashboard');
-    } finally {
-      setLoading(false);
     }
-  };
+  }, [currentForm.data]);
+
+  useEffect(() => {
+    // Handle submission success
+    if (formSubmission.success && formSubmission.submissionDetails) {
+      setSubmissionSuccess(true);
+      setSubmissionDetails(formSubmission.submissionDetails);
+    }
+  }, [formSubmission.success, formSubmission.submissionDetails]);
 
   // Convert file to base64
   const convertFileToBase64 = (file) => {
@@ -68,7 +76,6 @@ const FormSubmission = () => {
       const reader = new FileReader();
       reader.readAsDataURL(file);
       reader.onload = () => {
-        // Remove the data:image/png;base64, part and return only base64 string
         const base64String = reader.result.split(',')[1];
         resolve(base64String);
       };
@@ -77,10 +84,9 @@ const FormSubmission = () => {
   };
 
   const handleInputChange = (questionId, value) => {
-    // Don't store file upload values in responses
-    const question = form.questions?.find(q => q.id === questionId);
+    const question = currentForm.data?.questions?.find(q => q.id === questionId);
     if (question?.type?.toLowerCase() === 'file_upload' || question?.type?.toLowerCase() === 'file') {
-      return; // Skip storing file names in responses
+      return;
     }
     
     setResponses(prev => ({
@@ -91,7 +97,7 @@ const FormSubmission = () => {
 
   const handleFileUpload = (questionId, file) => {
     if (file) {
-      const maxSize = 5 * 1024 * 1024; // 5MB to match backend
+      const maxSize = 5 * 1024 * 1024;
       const allowedTypes = [
         'image/jpeg', 
         'image/jpg', 
@@ -116,7 +122,6 @@ const FormSubmission = () => {
         ...prev,
         [questionId]: file
       }));
-      // Don't call handleInputChange for files
     }
   };
 
@@ -126,7 +131,7 @@ const FormSubmission = () => {
 
   const handleConfirmClear = () => {
     const clearedResponses = {};
-    form.questions?.forEach(question => {
+    currentForm.data?.questions?.forEach(question => {
       if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
         // Skip file upload questions
       } else if (question.multiple_choice === true || question.type === 'checkbox') {
@@ -144,18 +149,13 @@ const FormSubmission = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Prevent double submission
-    if (submitting) {
+    if (formSubmission.submitting) {
       return;
     }
 
-    console.log('Current responses:', responses);
-    console.log('Current uploaded files:', uploadedFiles);
-    
     // Validate required fields
-    const requiredQuestions = form.questions?.filter(q => q.required) || [];
+    const requiredQuestions = currentForm.data?.questions?.filter(q => q.required) || [];
     for (const question of requiredQuestions) {
-      // Check if it's a file upload question
       if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
         if (!uploadedFiles[question.id]) {
           toast.error(`Please upload file for: ${question.text}`);
@@ -175,8 +175,6 @@ const FormSubmission = () => {
     }
 
     try {
-      setSubmitting(true);
-      
       // Prepare file uploads with base64 conversion
       const fileUploads = [];
       for (const [questionId, file] of Object.entries(uploadedFiles)) {
@@ -193,21 +191,18 @@ const FormSubmission = () => {
           } catch (fileError) {
             console.error('Error converting file:', fileError);
             toast.error(`Error processing file: ${file.name}`);
-            setSubmitting(false);
             return;
           }
         }
       }
       
-      // Prepare answers - FIXED: Only include non-file questions
+      // Prepare answers
       const answers = [];
-      form.questions?.forEach(question => {
-        // Skip file upload questions completely
+      currentForm.data?.questions?.forEach(question => {
         if (question.type?.toLowerCase() === 'file_upload' || question.type?.toLowerCase() === 'file') {
-          return; // Skip this iteration
+          return;
         }
         
-        // Include the answer for this question
         const answer = responses[question.id];
         if (answer !== undefined) {
           answers.push({
@@ -217,7 +212,7 @@ const FormSubmission = () => {
         }
       });
 
-      // Prepare submission data matching backend FormSubmissionDto
+      // Prepare submission data
       const submissionData = {
         formId: formId,
         answers: answers,
@@ -225,39 +220,22 @@ const FormSubmission = () => {
       };
 
       console.log('Submitting data:', submissionData);
-      console.log('Answers array:', submissionData.answers);
-      console.log('File uploads array:', submissionData.fileUploads);
-
-      const result = await responseService.submitResponse(submissionData);
       
-      if (result.success) {
-        // Instead of navigating immediately, show success card
-        setSubmissionSuccess(true);
-        setSubmissionDetails({
-          responseId: result.responseId,
-          formTitle: form.title,
-          submittedAt: new Date().toISOString()
-        });
-        toast.success('Form submitted successfully!');
-      } else {
-        toast.error(result.message || 'Failed to submit form');
-      }
+      // Dispatch submit action
+      await dispatch(submitFormResponse(submissionData)).unwrap();
+      
     } catch (error) {
       console.error('Submit error:', error);
-      toast.error(error.response?.data?.message || 'Failed to submit form. Please try again.');
-    } finally {
-      setSubmitting(false);
+      // Error handling is done in the slice
     }
   };
 
   const handleGoToSubmissions = () => {
+    dispatch(resetFormSubmission());
     navigate('/learner/dashboard', { state: { activeTab: 'submissions' } });
   };
 
   const renderQuestionInput = (question, index) => {
-    const emojiNumbers = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-    const emoji = emojiNumbers[index] || `${index + 1}.`;
-
     switch (question.type?.toLowerCase()) {
       case 'short_text':
       case 'short_answer':
@@ -267,7 +245,7 @@ const FormSubmission = () => {
             type="text"
             name={`question_${question.id}`}
             placeholder={question.placeholder || "Enter your answer"}
-            value={responses[question.id] || ''}
+                        value={responses[question.id] || ''}
             onChange={(e) => handleInputChange(question.id, e.target.value)}
             className="form-input"
             required={question.required}
@@ -291,17 +269,11 @@ const FormSubmission = () => {
 
       case 'choice':
       case 'dropdown':
-        // Check if it's multi-select based on multiple_choice field
         if (question.multipleChoice === true) {
-          // Render as checkboxes for multi-select
           return (
             <div className="checkbox-group">
               {question.options?.map((option, idx) => (
-        
                 <label key={idx} className="checkbox-label">
-                  <div>
-                    
-                  </div>
                   <input
                     type="checkbox"
                     value={typeof option === 'object' ? option.value : option}
@@ -324,7 +296,6 @@ const FormSubmission = () => {
             </div>
           );
         } else {
-          // Render as single select dropdown
           return (
             <select
               name={`question_${question.id}`}
@@ -474,7 +445,7 @@ const FormSubmission = () => {
     }
   };
 
-  if (loading) return <LoadingSpinner />;
+  if (currentForm.loading) return <LoadingSpinner />;
 
   if (submissionSuccess) {
     return (
@@ -518,7 +489,7 @@ const FormSubmission = () => {
     );
   }
 
-  if (!form) {
+  if (!currentForm.data) {
     return (
       <>
         <NavigationBar />
@@ -543,15 +514,13 @@ const FormSubmission = () => {
       <NavigationBar />
       <div className="form-submission-container">
         <div className="form-submission-card">
-          <h2>{form?.title || 'Form Submission'}</h2>
+          <h2>{currentForm.data?.title || 'Form Submission'}</h2>
           <p className="form-subtitle">
-            {form?.description || 'Please fill out this form completely and accurately.'}
+            {currentForm.data?.description || 'Please fill out this form completely and accurately.'}
           </p>
 
-          {/* Form tag wraps all content including buttons */}
-          {/* Form tag only wraps the questions */}
           <form onSubmit={handleSubmit} id="submission-form">
-            {form?.questions?.map((question, index) => (
+            {currentForm.data?.questions?.map((question, index) => (
               <div key={question.id} className="question-container">
                 <label className="form-label">
                   <span className="submission-q-number">{index + 1}</span> {question.text}
@@ -564,44 +533,42 @@ const FormSubmission = () => {
               </div>
             ))}
           </form>
-           </div>
+        </div>
       </div>
-          {/* Footer is outside the form */}
-          <div className="form-footer">
-            <div className="form-buttons">
-              <button 
-                type="button" 
-                className="clear-btn"
-                onClick={handleClearFormClick}
-                disabled={submitting}
-              >
-                Clear Form
-              </button>
-              
-              <div className="warning-message">
-                <p style={{
-                  marginTop: "7px",
-                  fontSize: "14px",
-                  fontWeight: "400",
-                  color: "#202223"
-                }}>
-                  This form cannot be saved temporarily, please submit once completed
-                </p>
-              </div>
-              
-              <button 
-                type="button"
-                className="submit-btn"
-                onClick={handleSubmit}
-                disabled={submitting}
-              >
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
-            </div>
+      
+      <div className="form-footer">
+        <div className="form-buttons">
+          <button 
+            type="button" 
+            className="clear-btn"
+            onClick={handleClearFormClick}
+            disabled={formSubmission.submitting}
+          >
+            Clear Form
+          </button>
+          
+          <div className="warning-message">
+            <p style={{
+              marginTop: "7px",
+              fontSize: "14px",
+              fontWeight: "400",
+              color: "#202223"
+            }}>
+              This form cannot be saved temporarily, please submit once completed
+            </p>
           </div>
-       
+          
+          <button 
+            type="button"
+            className="submit-btn"
+            onClick={handleSubmit}
+            disabled={formSubmission.submitting}
+          >
+            {formSubmission.submitting ? 'Submitting...' : 'Submit'}
+          </button>
+        </div>
+      </div>
 
-      {/* Clear Form Modal */}
       <Modal
         isOpen={showClearModal}
         onClose={() => setShowClearModal(false)}
@@ -615,3 +582,4 @@ const FormSubmission = () => {
 };
 
 export default FormSubmission;
+
